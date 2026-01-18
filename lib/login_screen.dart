@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'signup_screen.dart'; // contains ParentDashboard / TeacherDashboard
+import 'parent_dashboard_screen.dart';
 import 'services/api_service.dart';
 
 class LoginScreen extends StatefulWidget {
@@ -51,7 +52,9 @@ class _LoginScreenState extends State<LoginScreen> {
 
       if (role == "parent") {
         Navigator.of(context).pushReplacement(
-          MaterialPageRoute(builder: (_) => const ParentDashboard()),
+          MaterialPageRoute(
+            builder: (_) => ParentDashboardScreen(parentName: data["user"]["name"] ?? "Parent"),
+          ),
         );
       } else if (role == "teacher") {
         Navigator.of(context).pushReplacement(
