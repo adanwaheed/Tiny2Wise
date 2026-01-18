@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
-import 'signup_screen.dart';
+import 'signup_screen.dart'; // contains ParentDashboard / TeacherDashboard
+import 'services/api_service.dart';
 
 class LoginScreen extends StatefulWidget {
   const LoginScreen({super.key});
@@ -16,6 +17,7 @@ class _LoginScreenState extends State<LoginScreen> {
 
   bool rememberMe = false;
   bool obscure = true;
+  bool isLoading = false;
 
   final emailController = TextEditingController();
   final passController = TextEditingController();
@@ -25,6 +27,49 @@ class _LoginScreenState extends State<LoginScreen> {
     emailController.dispose();
     passController.dispose();
     super.dispose();
+  }
+
+  Future<void> _login() async {
+    final email = emailController.text.trim();
+    final pass = passController.text;
+
+    if (email.isEmpty || pass.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text("Please enter email and password")),
+      );
+      return;
+    }
+
+    setState(() => isLoading = true);
+
+    try {
+      final data = await ApiService.login(email: email, password: pass);
+
+      final role = (data["user"]?["role"] ?? "").toString().toLowerCase();
+
+      if (!mounted) return;
+
+      if (role == "parent") {
+        Navigator.of(context).pushReplacement(
+          MaterialPageRoute(builder: (_) => const ParentDashboard()),
+        );
+      } else if (role == "teacher") {
+        Navigator.of(context).pushReplacement(
+          MaterialPageRoute(builder: (_) => const TeacherDashboard()),
+        );
+      } else {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text("Login success but role is invalid.")),
+        );
+      }
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text("Login failed: $e")),
+      );
+    } finally {
+      if (mounted) setState(() => isLoading = false);
+    }
   }
 
   @override
@@ -72,7 +117,7 @@ class _LoginScreenState extends State<LoginScreen> {
                         ),
                         child: const Center(
                           child: Icon(
-                            Icons.phone_android_rounded,
+                            Icons.child_care_sharp,
                             size: 64,
                             color: Color(0xFFB6DCC6),
                           ),
@@ -111,11 +156,11 @@ class _LoginScreenState extends State<LoginScreen> {
 
                           const SizedBox(height: 14),
 
-                          // Tiny2Wise title (increased)
+                          // Tiny2Wise title
                           RichText(
-                            text: const TextSpan(
-                              style: TextStyle(
-                                fontSize: 32, // was 28
+                            text: TextSpan(
+                              style: const TextStyle(
+                                fontSize: 32,
                                 fontWeight: FontWeight.w700,
                                 color: dark,
                               ),
@@ -136,40 +181,37 @@ class _LoginScreenState extends State<LoginScreen> {
 
                           const SizedBox(height: 6),
 
-                          // Tagline (increased)
                           const Text(
                             "Voice Across Generations",
                             style: TextStyle(
                               color: grey,
-                              fontSize: 14, // was 12.5
+                              fontSize: 14,
                               fontWeight: FontWeight.w500,
                             ),
                           ),
 
                           const SizedBox(height: 22),
 
-                          // Welcome Back (increased)
                           const Align(
                             alignment: Alignment.centerLeft,
                             child: Text(
                               "Welcome Back!",
                               style: TextStyle(
                                 color: dark,
-                                fontSize: 28, // was 24
+                                fontSize: 28,
                                 fontWeight: FontWeight.w800,
                               ),
                             ),
                           ),
                           const SizedBox(height: 6),
 
-                          // Subtitle (increased)
                           const Align(
                             alignment: Alignment.centerLeft,
                             child: Text(
                               "Let's continue learning & growing together.",
                               style: TextStyle(
                                 color: grey,
-                                fontSize: 15, // was 13
+                                fontSize: 15,
                                 fontWeight: FontWeight.w500,
                               ),
                             ),
@@ -177,14 +219,13 @@ class _LoginScreenState extends State<LoginScreen> {
 
                           const SizedBox(height: 18),
 
-                          // Email label (increased)
                           const Align(
                             alignment: Alignment.centerLeft,
                             child: Text(
                               "Email Address",
                               style: TextStyle(
                                 color: dark,
-                                fontSize: 15, // was 13
+                                fontSize: 15,
                                 fontWeight: FontWeight.w700,
                               ),
                             ),
@@ -200,14 +241,13 @@ class _LoginScreenState extends State<LoginScreen> {
 
                           const SizedBox(height: 14),
 
-                          // Password label (increased)
                           const Align(
                             alignment: Alignment.centerLeft,
                             child: Text(
                               "Password",
                               style: TextStyle(
                                 color: dark,
-                                fontSize: 15, // was 13
+                                fontSize: 15,
                                 fontWeight: FontWeight.w700,
                               ),
                             ),
@@ -228,14 +268,13 @@ class _LoginScreenState extends State<LoginScreen> {
                                     ? Icons.visibility_off_outlined
                                     : Icons.visibility_outlined,
                                 color: const Color(0xFF9AA6AC),
-                                size: 22, // was 20
+                                size: 22,
                               ),
                             ),
                           ),
 
                           const SizedBox(height: 10),
 
-                          // Remember + Forgot (increased)
                           Row(
                             children: [
                               Transform.scale(
@@ -255,7 +294,7 @@ class _LoginScreenState extends State<LoginScreen> {
                                 "Remember me",
                                 style: TextStyle(
                                   color: grey,
-                                  fontSize: 14, // was 12.5
+                                  fontSize: 14,
                                   fontWeight: FontWeight.w600,
                                 ),
                               ),
@@ -266,7 +305,7 @@ class _LoginScreenState extends State<LoginScreen> {
                                   "Forgot Password?",
                                   style: TextStyle(
                                     color: green,
-                                    fontSize: 14, // was 12.5
+                                    fontSize: 14,
                                     fontWeight: FontWeight.w700,
                                   ),
                                 ),
@@ -276,10 +315,10 @@ class _LoginScreenState extends State<LoginScreen> {
 
                           const SizedBox(height: 6),
 
-                          // Login button (text increased)
+                          // Login button (connected to API)
                           SizedBox(
                             width: double.infinity,
-                            height: 54, // was 52
+                            height: 54,
                             child: ElevatedButton(
                               style: ElevatedButton.styleFrom(
                                 backgroundColor: green,
@@ -288,21 +327,31 @@ class _LoginScreenState extends State<LoginScreen> {
                                   borderRadius: BorderRadius.circular(14),
                                 ),
                               ),
-                              onPressed: () {},
-                              child: const Row(
-                                mainAxisAlignment: MainAxisAlignment.center,
+                              onPressed: isLoading ? null : _login,
+                              child: isLoading
+                                  ? const SizedBox(
+                                width: 22,
+                                height: 22,
+                                child: CircularProgressIndicator(
+                                  strokeWidth: 2.6,
+                                  color: Colors.white,
+                                ),
+                              )
+                                  : const Row(
+                                mainAxisAlignment:
+                                MainAxisAlignment.center,
                                 children: [
                                   Text(
                                     "Login to Account",
                                     style: TextStyle(
                                       color: Colors.white,
-                                      fontSize: 16, // was 14.5
+                                      fontSize: 16,
                                       fontWeight: FontWeight.w800,
                                     ),
                                   ),
                                   SizedBox(width: 10),
                                   Icon(Icons.arrow_forward,
-                                      color: Colors.white, size: 20), // was 18
+                                      color: Colors.white, size: 20),
                                 ],
                               ),
                             ),
@@ -310,36 +359,30 @@ class _LoginScreenState extends State<LoginScreen> {
 
                           const SizedBox(height: 18),
 
-                          // Or continue with (increased)
                           Row(
-                            children: [
-                              const Expanded(
-                                child: Divider(
-                                  color: Color(0xFFCBD5D1),
-                                ),
+                            children: const [
+                              Expanded(
+                                child: Divider(color: Color(0xFFCBD5D1)),
                               ),
-                              const Padding(
+                              Padding(
                                 padding: EdgeInsets.symmetric(horizontal: 10),
                                 child: Text(
                                   "Or continue with",
                                   style: TextStyle(
                                     color: grey,
-                                    fontSize: 13, // was 12
+                                    fontSize: 13,
                                     fontWeight: FontWeight.w600,
                                   ),
                                 ),
                               ),
-                              const Expanded(
-                                child: Divider(
-                                  color: Color(0xFFCBD5D1),
-                                ),
+                              Expanded(
+                                child: Divider(color: Color(0xFFCBD5D1)),
                               ),
                             ],
                           ),
 
                           const SizedBox(height: 14),
 
-                          // Google + Apple buttons (text increased)
                           Row(
                             children: [
                               Expanded(
@@ -351,15 +394,15 @@ class _LoginScreenState extends State<LoginScreen> {
                                     children: [
                                       Image.asset(
                                         "assets/google.jpg",
-                                        width: 20, // was 18
-                                        height: 20, // was 18
+                                        width: 20,
+                                        height: 20,
                                       ),
                                       const SizedBox(width: 10),
                                       const Text(
                                         "Google",
                                         style: TextStyle(
                                           color: dark,
-                                          fontSize: 15, // was 13
+                                          fontSize: 15,
                                           fontWeight: FontWeight.w700,
                                         ),
                                       ),
@@ -375,15 +418,15 @@ class _LoginScreenState extends State<LoginScreen> {
                                   borderColor: Colors.black,
                                   child: Row(
                                     mainAxisAlignment: MainAxisAlignment.center,
-                                    children: [
-                                      const Icon(Icons.apple,
+                                    children: const [
+                                      Icon(Icons.apple,
                                           color: Colors.white, size: 20),
-                                      const SizedBox(width: 10),
-                                      const Text(
+                                      SizedBox(width: 10),
+                                      Text(
                                         "Apple",
                                         style: TextStyle(
                                           color: Colors.white,
-                                          fontSize: 15, // was 13
+                                          fontSize: 15,
                                           fontWeight: FontWeight.w700,
                                         ),
                                       ),
@@ -400,7 +443,8 @@ class _LoginScreenState extends State<LoginScreen> {
                           GestureDetector(
                             onTap: () {
                               Navigator.of(context).push(
-                                MaterialPageRoute(builder: (_) => const SignupScreen()),
+                                MaterialPageRoute(
+                                    builder: (_) => const SignupScreen()),
                               );
                             },
                             child: RichText(
@@ -427,7 +471,6 @@ class _LoginScreenState extends State<LoginScreen> {
 
                           const SizedBox(height: 18),
 
-                          // Bottom small plant watermark
                           const Opacity(
                             opacity: 0.15,
                             child: Icon(
@@ -477,7 +520,7 @@ class _InputField extends StatelessWidget {
         controller: controller,
         obscureText: obscure,
         style: const TextStyle(
-          fontSize: 15.5, // was 13.5
+          fontSize: 15.5,
           fontWeight: FontWeight.w600,
           color: Color(0xFF1F2A2E),
         ),
@@ -486,7 +529,7 @@ class _InputField extends StatelessWidget {
           hintStyle: const TextStyle(
             color: Color(0xFF9AA6AC),
             fontWeight: FontWeight.w600,
-            fontSize: 15, // was 13
+            fontSize: 15,
           ),
           prefixIcon: Icon(prefixIcon, color: Color(0xFF9AA6AC), size: 22),
           suffixIcon: suffix,
@@ -518,7 +561,7 @@ class _SocialButton extends StatelessWidget {
       borderRadius: BorderRadius.circular(12),
       onTap: onTap,
       child: Ink(
-        height: 50, // was 48
+        height: 50,
         decoration: BoxDecoration(
           color: bgColor,
           borderRadius: BorderRadius.circular(12),

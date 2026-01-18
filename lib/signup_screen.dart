@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'login_screen.dart';
+import 'services/api_service.dart';
 
 class SignupScreen extends StatefulWidget {
   const SignupScreen({super.key});
@@ -19,6 +20,7 @@ class _SignupScreenState extends State<SignupScreen> {
 
   UserRole selectedRole = UserRole.parent;
   bool obscure = true;
+  bool isLoading = false;
 
   final nameController = TextEditingController();
   final emailController = TextEditingController();
@@ -32,18 +34,68 @@ class _SignupScreenState extends State<SignupScreen> {
     super.dispose();
   }
 
-  void _createAccount() {
-    // ✅ Same signup screen, different procedure based on role
-    // TODO: Add different signup logic here (Parent vs Teacher)
+  // ✅ Password validation: 8+ chars, at least 1 uppercase, 1 lowercase
+  bool _isPasswordValid(String password) {
+    if (password.length < 8) return false;
+    final hasUpper = RegExp(r'[A-Z]').hasMatch(password);
+    final hasLower = RegExp(r'[a-z]').hasMatch(password);
+    return hasUpper && hasLower;
+  }
 
-    if (selectedRole == UserRole.parent) {
-      Navigator.of(context).pushReplacement(
-        MaterialPageRoute(builder: (_) => const ParentDashboard()),
+  Future<void> _createAccount() async {
+    final name = nameController.text.trim();
+    final email = emailController.text.trim();
+    final password = passController.text;
+
+    if (name.isEmpty || email.isEmpty || password.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text("Please fill all fields")),
       );
-    } else {
-      Navigator.of(context).pushReplacement(
-        MaterialPageRoute(builder: (_) => const TeacherDashboard()),
+      return;
+    }
+
+    // ✅ Password validation
+    if (!_isPasswordValid(password)) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text(
+            "Password must be at least 8 characters and include 1 uppercase & 1 lowercase letter.",
+          ),
+        ),
       );
+      return;
+    }
+
+    final role = selectedRole == UserRole.parent ? "parent" : "teacher";
+
+    setState(() => isLoading = true);
+
+    try {
+      await ApiService.signup(
+        role: role,
+        name: name,
+        email: email,
+        password: password,
+      );
+
+      if (!mounted) return;
+
+      if (role == "parent") {
+        Navigator.of(context).pushReplacement(
+          MaterialPageRoute(builder: (_) => const ParentDashboard()),
+        );
+      } else {
+        Navigator.of(context).pushReplacement(
+          MaterialPageRoute(builder: (_) => const TeacherDashboard()),
+        );
+      }
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text("Signup failed: $e")),
+      );
+    } finally {
+      if (mounted) setState(() => isLoading = false);
     }
   }
 
@@ -61,7 +113,6 @@ class _SignupScreenState extends State<SignupScreen> {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                // Header
                 const Text(
                   "Start their journey",
                   style: TextStyle(
@@ -81,10 +132,8 @@ class _SignupScreenState extends State<SignupScreen> {
                     height: 1.3,
                   ),
                 ),
-
                 const SizedBox(height: 16),
 
-                // Role cards row
                 Row(
                   children: [
                     Expanded(
@@ -93,7 +142,8 @@ class _SignupScreenState extends State<SignupScreen> {
                         title: "Parent",
                         subtitle: "Track progress at home",
                         icon: Icons.group_outlined,
-                        onTap: () => setState(() => selectedRole = UserRole.parent),
+                        onTap: () =>
+                            setState(() => selectedRole = UserRole.parent),
                       ),
                     ),
                     const SizedBox(width: 12),
@@ -103,7 +153,8 @@ class _SignupScreenState extends State<SignupScreen> {
                         title: "Teacher",
                         subtitle: "Classroom tools",
                         icon: Icons.school_outlined,
-                        onTap: () => setState(() => selectedRole = UserRole.teacher),
+                        onTap: () =>
+                            setState(() => selectedRole = UserRole.teacher),
                       ),
                     ),
                   ],
@@ -111,7 +162,6 @@ class _SignupScreenState extends State<SignupScreen> {
 
                 const SizedBox(height: 16),
 
-                // Inputs
                 _InputField(
                   controller: nameController,
                   hint: "What's your full name?",
@@ -133,7 +183,9 @@ class _SignupScreenState extends State<SignupScreen> {
                   suffix: IconButton(
                     onPressed: () => setState(() => obscure = !obscure),
                     icon: Icon(
-                      obscure ? Icons.visibility_off_outlined : Icons.visibility_outlined,
+                      obscure
+                          ? Icons.visibility_off_outlined
+                          : Icons.visibility_outlined,
                       color: const Color(0xFF9AA6AC),
                       size: 22,
                     ),
@@ -142,14 +194,16 @@ class _SignupScreenState extends State<SignupScreen> {
 
                 const SizedBox(height: 10),
 
-                // Password helper box (green tint like image)
                 Container(
                   width: double.infinity,
-                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                  padding:
+                  const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
                   decoration: BoxDecoration(
                     color: const Color(0xFF27C267).withOpacity(0.10),
                     borderRadius: BorderRadius.circular(12),
-                    border: Border.all(color: const Color(0xFF27C267).withOpacity(0.25)),
+                    border: Border.all(
+                      color: const Color(0xFF27C267).withOpacity(0.25),
+                    ),
                   ),
                   child: const Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
@@ -178,7 +232,6 @@ class _SignupScreenState extends State<SignupScreen> {
 
                 const SizedBox(height: 14),
 
-                // Create account button
                 SizedBox(
                   width: double.infinity,
                   height: 54,
@@ -190,8 +243,17 @@ class _SignupScreenState extends State<SignupScreen> {
                         borderRadius: BorderRadius.circular(14),
                       ),
                     ),
-                    onPressed: _createAccount,
-                    child: const Text(
+                    onPressed: isLoading ? null : _createAccount,
+                    child: isLoading
+                        ? const SizedBox(
+                      width: 22,
+                      height: 22,
+                      child: CircularProgressIndicator(
+                        strokeWidth: 2.5,
+                        color: Colors.white,
+                      ),
+                    )
+                        : const Text(
                       "Create Account",
                       style: TextStyle(
                         color: Colors.white,
@@ -204,11 +266,12 @@ class _SignupScreenState extends State<SignupScreen> {
 
                 const SizedBox(height: 16),
 
-                // Or continue with
                 Row(
                   children: [
                     Expanded(
-                      child: Divider(color: const Color(0xFFCBD5D1).withOpacity(0.9)),
+                      child: Divider(
+                        color: const Color(0xFFCBD5D1).withOpacity(0.9),
+                      ),
                     ),
                     const Padding(
                       padding: EdgeInsets.symmetric(horizontal: 10),
@@ -222,14 +285,15 @@ class _SignupScreenState extends State<SignupScreen> {
                       ),
                     ),
                     Expanded(
-                      child: Divider(color: const Color(0xFFCBD5D1).withOpacity(0.9)),
+                      child: Divider(
+                        color: const Color(0xFFCBD5D1).withOpacity(0.9),
+                      ),
                     ),
                   ],
                 ),
 
                 const SizedBox(height: 14),
 
-                // Google + Apple
                 Row(
                   children: [
                     Expanded(
@@ -240,8 +304,8 @@ class _SignupScreenState extends State<SignupScreen> {
                         child: Row(
                           mainAxisAlignment: MainAxisAlignment.center,
                           children: [
-                            // If you already have google icon image:
-                            Image.asset("assets/google.jpg", width: 20, height: 20),
+                            Image.asset("assets/google.jpg",
+                                width: 20, height: 20),
                             const SizedBox(width: 10),
                             const Text(
                               "Google",
@@ -283,7 +347,6 @@ class _SignupScreenState extends State<SignupScreen> {
 
                 const SizedBox(height: 14),
 
-                // Login link
                 Center(
                   child: GestureDetector(
                     onTap: () {
@@ -316,7 +379,6 @@ class _SignupScreenState extends State<SignupScreen> {
 
                 const SizedBox(height: 18),
 
-                // Bottom icon watermark
                 const Center(
                   child: Opacity(
                     opacity: 0.12,
@@ -360,7 +422,6 @@ class _RoleCard extends StatelessWidget {
     return GestureDetector(
       onTap: onTap,
       child: Container(
-        // ✅ slightly bigger + safe
         height: 150,
         padding: const EdgeInsets.all(14),
         decoration: BoxDecoration(
@@ -379,7 +440,7 @@ class _RoleCard extends StatelessWidget {
           ],
         ),
         child: Column(
-          mainAxisAlignment: MainAxisAlignment.spaceBetween, // ✅ prevents overflow
+          mainAxisAlignment: MainAxisAlignment.spaceBetween,
           children: [
             Container(
               width: 50,
@@ -394,7 +455,6 @@ class _RoleCard extends StatelessWidget {
                 color: active ? Colors.white : const Color(0xFF9AA6AC),
               ),
             ),
-
             Column(
               children: [
                 Text(
@@ -410,8 +470,8 @@ class _RoleCard extends StatelessWidget {
                 Text(
                   subtitle,
                   textAlign: TextAlign.center,
-                  maxLines: 2, // ✅ limit lines
-                  overflow: TextOverflow.ellipsis, // ✅ no overflow
+                  maxLines: 2,
+                  overflow: TextOverflow.ellipsis,
                   style: const TextStyle(
                     color: grey,
                     fontSize: 11.5,
@@ -421,7 +481,6 @@ class _RoleCard extends StatelessWidget {
                 ),
               ],
             ),
-
             Icon(
               Icons.check_circle,
               size: 18,
@@ -433,7 +492,6 @@ class _RoleCard extends StatelessWidget {
     );
   }
 }
-
 
 class _InputField extends StatelessWidget {
   final TextEditingController controller;
@@ -479,7 +537,8 @@ class _InputField extends StatelessWidget {
           prefixIcon: Icon(prefixIcon, color: Color(0xFF9AA6AC), size: 22),
           suffixIcon: suffix,
           border: InputBorder.none,
-          contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 16),
+          contentPadding:
+          const EdgeInsets.symmetric(horizontal: 12, vertical: 16),
         ),
       ),
     );
