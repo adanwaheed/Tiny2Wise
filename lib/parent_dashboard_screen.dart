@@ -93,7 +93,7 @@ class _ParentDashboardScreenState extends State<ParentDashboardScreen>
       speechAccuracy = (p["speechAccuracy"] ?? 0).toDouble();
       progressNote = (p["note"] ?? "").toString();
       if (progressNote.trim().isEmpty) {
-        progressNote = "Keep going — small steps, big progress!";
+        progressNote = "Keep going - small steps, big progress!";
       }
     } catch (e) {
       _toast("Progress error: $e");

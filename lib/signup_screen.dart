@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'login_screen.dart';
 import 'parent_dashboard_screen.dart';
+import 'teacher_dashboard_screen.dart';
 import 'services/api_service.dart';
 
 class SignupScreen extends StatefulWidget {
@@ -55,7 +56,6 @@ class _SignupScreenState extends State<SignupScreen> {
       return;
     }
 
-    // ✅ Password validation
     if (!_isPasswordValid(password)) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
@@ -72,7 +72,8 @@ class _SignupScreenState extends State<SignupScreen> {
     setState(() => isLoading = true);
 
     try {
-      await ApiService.signup(
+      // ✅ capture returned data (token + user)
+      final data = await ApiService.signup(
         role: role,
         name: name,
         email: email,
@@ -81,13 +82,28 @@ class _SignupScreenState extends State<SignupScreen> {
 
       if (!mounted) return;
 
-      if (role == "parent") {
+      final userRole =
+      (data["user"]?["role"] ?? role).toString().toLowerCase();
+      final userName = (data["user"]?["name"] ?? name).toString();
+
+      if (userRole == "parent") {
         Navigator.of(context).pushReplacement(
-          MaterialPageRoute(builder: (_) => const ParentDashboard()),
+          MaterialPageRoute(
+            builder: (_) => ParentDashboardScreen(parentName: userName),
+          ),
+        );
+      } else if (userRole == "teacher") {
+        Navigator.of(context).pushReplacement(
+          MaterialPageRoute(
+            builder: (_) => TeacherDashboardScreen(
+              teacherName: (data["user"]?["name"] ?? name).toString(),
+              teacherEmail: (data["user"]?["email"] ?? email).toString(),
+            ),
+          ),
         );
       } else {
-        Navigator.of(context).pushReplacement(
-          MaterialPageRoute(builder: (_) => const TeacherDashboard()),
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text("Signup success but role is invalid.")),
         );
       }
     } catch (e) {
@@ -98,6 +114,20 @@ class _SignupScreenState extends State<SignupScreen> {
     } finally {
       if (mounted) setState(() => isLoading = false);
     }
+  }
+
+  void _googleSignup() {
+    // TODO: Integrate Google Sign-In
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(content: Text("Google signup is not connected yet.")),
+    );
+  }
+
+  void _appleSignup() {
+    // TODO: Integrate Apple Sign-In
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(content: Text("Apple signup is not connected yet.")),
+    );
   }
 
   @override
@@ -268,13 +298,11 @@ class _SignupScreenState extends State<SignupScreen> {
                 const SizedBox(height: 16),
 
                 Row(
-                  children: [
+                  children: const [
                     Expanded(
-                      child: Divider(
-                        color: const Color(0xFFCBD5D1).withOpacity(0.9),
-                      ),
+                      child: Divider(color: Color(0xFFCBD5D1)),
                     ),
-                    const Padding(
+                    Padding(
                       padding: EdgeInsets.symmetric(horizontal: 10),
                       child: Text(
                         "Or continue with",
@@ -286,27 +314,29 @@ class _SignupScreenState extends State<SignupScreen> {
                       ),
                     ),
                     Expanded(
-                      child: Divider(
-                        color: const Color(0xFFCBD5D1).withOpacity(0.9),
-                      ),
+                      child: Divider(color: Color(0xFFCBD5D1)),
                     ),
                   ],
                 ),
 
                 const SizedBox(height: 14),
 
+                // ✅ Google + Apple buttons (added back)
                 Row(
                   children: [
                     Expanded(
                       child: _SocialButton(
                         bgColor: Colors.white,
                         borderColor: border,
-                        onTap: () {},
+                        onTap: _googleSignup,
                         child: Row(
                           mainAxisAlignment: MainAxisAlignment.center,
                           children: [
-                            Image.asset("assets/google.jpg",
-                                width: 20, height: 20),
+                            Image.asset(
+                              "assets/google.jpg",
+                              width: 20,
+                              height: 20,
+                            ),
                             const SizedBox(width: 10),
                             const Text(
                               "Google",
@@ -325,7 +355,7 @@ class _SignupScreenState extends State<SignupScreen> {
                       child: _SocialButton(
                         bgColor: Colors.black,
                         borderColor: Colors.black,
-                        onTap: () {},
+                        onTap: _appleSignup,
                         child: Row(
                           mainAxisAlignment: MainAxisAlignment.center,
                           children: const [
@@ -374,19 +404,6 @@ class _SignupScreenState extends State<SignupScreen> {
                           ),
                         ],
                       ),
-                    ),
-                  ),
-                ),
-
-                const SizedBox(height: 18),
-
-                const Center(
-                  child: Opacity(
-                    opacity: 0.12,
-                    child: Icon(
-                      Icons.eco_outlined,
-                      size: 72,
-                      color: green,
                     ),
                   ),
                 ),
@@ -572,40 +589,6 @@ class _SocialButton extends StatelessWidget {
           border: Border.all(color: borderColor),
         ),
         child: Center(child: child),
-      ),
-    );
-  }
-}
-
-// -------------------- Dashboards (placeholders) --------------------
-
-class ParentDashboard extends StatelessWidget {
-  const ParentDashboard({super.key});
-
-  @override
-  Widget build(BuildContext context) {
-    return const Scaffold(
-      body: Center(
-        child: Text(
-          "Parent Dashboard",
-          style: TextStyle(fontSize: 22, fontWeight: FontWeight.w700),
-        ),
-      ),
-    );
-  }
-}
-
-class TeacherDashboard extends StatelessWidget {
-  const TeacherDashboard({super.key});
-
-  @override
-  Widget build(BuildContext context) {
-    return const Scaffold(
-      body: Center(
-        child: Text(
-          "Teacher Dashboard",
-          style: TextStyle(fontSize: 22, fontWeight: FontWeight.w700),
-        ),
       ),
     );
   }

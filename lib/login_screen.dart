@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
-import 'signup_screen.dart'; // contains ParentDashboard / TeacherDashboard
+import 'signup_screen.dart';
 import 'parent_dashboard_screen.dart';
+import 'teacher_dashboard_screen.dart';
 import 'services/api_service.dart';
 
 class LoginScreen extends StatefulWidget {
@@ -57,8 +58,16 @@ class _LoginScreenState extends State<LoginScreen> {
           ),
         );
       } else if (role == "teacher") {
+        final teacherName = (data["user"]?["name"] ?? "").toString().trim();
+        final teacherEmail = (data["user"]?["email"] ?? email).toString();
+
         Navigator.of(context).pushReplacement(
-          MaterialPageRoute(builder: (_) => const TeacherDashboard()),
+          MaterialPageRoute(
+            builder: (_) => TeacherDashboardScreen(
+              teacherName: teacherName.isEmpty ? teacherEmail.split("@").first : teacherName,
+              teacherEmail: teacherEmail,
+            ),
+          ),
         );
       } else {
         ScaffoldMessenger.of(context).showSnackBar(

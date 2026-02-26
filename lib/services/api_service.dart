@@ -5,11 +5,8 @@ import 'package:http/http.dart' as http;
 import 'package:shared_preferences/shared_preferences.dart';
 
 class ApiService {
-  // Android Emulator: http://10.0.2.2:3000
-  // Real device: http://YOUR_PC_IP:3000
   static const String baseUrl = "http://10.0.2.2:3000";
 
-  // ✅ Converts "/api/..." into "http://10.0.2.2:3000/api/..."
   static String absoluteUrl(String path) {
     final p = path.trim();
     if (p.isEmpty) return p;
@@ -35,6 +32,22 @@ class ApiService {
     await sp.remove("token");
   }
 
+  static Map<String, dynamic> _safeJson(String body) {
+    try {
+      final decoded = jsonDecode(body);
+      if (decoded is Map<String, dynamic>) return decoded;
+      return {"raw": decoded};
+    } catch (_) {
+      return {"message": body};
+    }
+  }
+
+  static Future<Map<String, String>> _authHeaders() async {
+    final token = await getToken();
+    if (token == null) throw "Token missing. Please login again.";
+    return {"Authorization": "Bearer $token"};
+  }
+
   // -------------------- AUTH --------------------
 
   static Future<Map<String, dynamic>> login({
@@ -48,16 +61,12 @@ class ApiService {
     );
 
     final data = _safeJson(res.body);
-
-    if (res.statusCode != 200) {
-      throw (data["message"] ?? "Login failed").toString();
-    }
+    if (res.statusCode != 200) throw (data["message"] ?? "Login failed").toString();
 
     final token = data["token"]?.toString();
     if (token != null && token.isNotEmpty) {
       await saveToken(token);
     }
-
     return data;
   }
 
@@ -79,35 +88,27 @@ class ApiService {
     );
 
     final data = _safeJson(res.body);
-
-    if (res.statusCode != 200) {
-      throw (data["message"] ?? "Signup failed").toString();
-    }
+    if (res.statusCode != 200) throw (data["message"] ?? "Signup failed").toString();
 
     final token = data["token"]?.toString();
     if (token != null && token.isNotEmpty) {
       await saveToken(token);
     }
-
     return data;
   }
 
-  // -------------------- TODDLERS --------------------
+  // -------------------- TODDLERS (Parent) --------------------
 
   static Future<List<dynamic>> getToddlers() async {
-    final token = await getToken();
-    if (token == null) throw "Token missing. Please login again.";
+    final headers = await _authHeaders();
 
     final res = await http.get(
       Uri.parse("$baseUrl/api/toddlers"),
-      headers: {"Authorization": "Bearer $token"},
+      headers: headers,
     );
 
     final data = _safeJson(res.body);
-
-    if (res.statusCode != 200) {
-      throw (data["message"] ?? "Failed to load toddlers").toString();
-    }
+    if (res.statusCode != 200) throw (data["message"] ?? "Failed to load toddlers").toString();
 
     return (data["toddlers"] as List<dynamic>? ?? []);
   }
@@ -123,7 +124,6 @@ class ApiService {
     if (token == null) throw "Token missing. Please login again.";
 
     final uri = Uri.parse("$baseUrl/api/toddlers");
-
     final req = http.MultipartRequest("POST", uri);
     req.headers["Authorization"] = "Bearer $token";
 
@@ -140,56 +140,127 @@ class ApiService {
     final body = await streamed.stream.bytesToString();
     final data = _safeJson(body);
 
-    if (streamed.statusCode != 200) {
-      throw (data["message"] ?? "Failed to create toddler").toString();
-    }
-
+    if (streamed.statusCode != 200) throw (data["message"] ?? "Failed to create toddler").toString();
     return data;
   }
 
   static Future<void> setActiveToddler(String toddlerId) async {
-    final token = await getToken();
-    if (token == null) throw "Token missing. Please login again.";
+    final headers = await _authHeaders();
 
     final res = await http.put(
       Uri.parse("$baseUrl/api/toddlers/$toddlerId/active"),
-      headers: {"Authorization": "Bearer $token"},
+      headers: headers,
     );
 
     final data = _safeJson(res.body);
-
-    if (res.statusCode != 200) {
-      throw (data["message"] ?? "Failed to set active toddler").toString();
-    }
+    if (res.statusCode != 200) throw (data["message"] ?? "Failed to set active toddler").toString();
   }
 
   static Future<Map<String, dynamic>> getToddlerProgress(String toddlerId) async {
-    final token = await getToken();
-    if (token == null) throw "Token missing. Please login again.";
+    final headers = await _authHeaders();
 
     final res = await http.get(
       Uri.parse("$baseUrl/api/toddlers/$toddlerId/progress"),
-      headers: {"Authorization": "Bearer $token"},
+      headers: headers,
     );
 
     final data = _safeJson(res.body);
-
-    if (res.statusCode != 200) {
-      throw (data["message"] ?? "Failed to load progress").toString();
-    }
+    if (res.statusCode != 200) throw (data["message"] ?? "Failed to load progress").toString();
 
     return data;
   }
 
-  // -------------------- HELPERS --------------------
+  // -------------------- TEACHER (NEW) --------------------
 
-  static Map<String, dynamic> _safeJson(String body) {
-    try {
-      final decoded = jsonDecode(body);
-      if (decoded is Map<String, dynamic>) return decoded;
-      return {"raw": decoded};
-    } catch (_) {
-      return {"message": body};
-    }
+  static Future<Map<String, dynamic>> getTeacherDashboard() async {
+    final headers = await _authHeaders();
+
+    final res = await http.get(
+      Uri.parse("$baseUrl/api/teacher/dashboard"),
+      headers: headers,
+    );
+
+    final data = _safeJson(res.body);
+    if (res.statusCode != 200) throw (data["message"] ?? "Failed to load teacher dashboard").toString();
+
+    return data;
+  }
+
+  static Future<List<dynamic>> getTeacherClasses() async {
+    final headers = await _authHeaders();
+
+    final res = await http.get(
+      Uri.parse("$baseUrl/api/teacher/classes"),
+      headers: headers,
+    );
+
+    final data = _safeJson(res.body);
+    if (res.statusCode != 200) throw (data["message"] ?? "Failed to load classes").toString();
+
+    return (data["classes"] as List<dynamic>? ?? []);
+  }
+
+  static Future<Map<String, dynamic>> createTeacherClass({
+    required String title,
+    String subtitle = "",
+  }) async {
+    final headers = await _authHeaders();
+
+    final res = await http.post(
+      Uri.parse("$baseUrl/api/teacher/classes"),
+      headers: {
+        ...headers,
+        "Content-Type": "application/json",
+      },
+      body: jsonEncode({
+        "title": title,
+        "subtitle": subtitle,
+      }),
+    );
+
+    final data = _safeJson(res.body);
+    if (res.statusCode != 200) throw (data["message"] ?? "Failed to create class").toString();
+
+    return data;
+  }
+
+  static Future<List<dynamic>> getTeacherEvents() async {
+    final headers = await _authHeaders();
+
+    final res = await http.get(
+      Uri.parse("$baseUrl/api/teacher/events"),
+      headers: headers,
+    );
+
+    final data = _safeJson(res.body);
+    if (res.statusCode != 200) throw (data["message"] ?? "Failed to load events").toString();
+
+    return (data["events"] as List<dynamic>? ?? []);
+  }
+
+  static Future<Map<String, dynamic>> createTeacherEvent({
+    required String title,
+    required DateTime startAt,
+    String note = "",
+  }) async {
+    final headers = await _authHeaders();
+
+    final res = await http.post(
+      Uri.parse("$baseUrl/api/teacher/events"),
+      headers: {
+        ...headers,
+        "Content-Type": "application/json",
+      },
+      body: jsonEncode({
+        "title": title,
+        "startAt": startAt.toIso8601String(),
+        "note": note,
+      }),
+    );
+
+    final data = _safeJson(res.body);
+    if (res.statusCode != 200) throw (data["message"] ?? "Failed to create event").toString();
+
+    return data;
   }
 }

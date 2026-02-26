@@ -80,23 +80,23 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
                 // ✅ Feature cards (title font size increased)
                 _FeatureCard(
                   icon: Icons.videogame_asset_sharp,
-                  title: "Toddler Speech",
-                  subtitle: "Track & boost vocabulary development",
+                  title: "Toddler Learning Dashboard",
+                  subtitle: "Build vocabulary with fun daily practice",
                   iconBg: green,
                   titleFontSize: 20, // increase here
                 ),
                 const SizedBox(height: 12),
                 _FeatureCard(
                   icon: Icons.newspaper_outlined,
-                  title: "Urdu News",
-                  subtitle: "Daily audio summaries for parents",
+                  title: "Parent Dashboard & News",
+                  subtitle: "Daily tracking & summaries for parents",
                   iconBg: green,
                   titleFontSize: 20, // increase here
                 ),
                 const SizedBox(height: 12),
                 _FeatureCard(
                   icon: Icons.handyman_outlined,
-                  title: "Teacher Tools",
+                  title: "Teacher Dashboard & Tools",
                   subtitle: "Resources for classrooms",
                   iconBg: green,
                   titleFontSize: 20, // increase here
