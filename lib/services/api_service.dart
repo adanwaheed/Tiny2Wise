@@ -1,7 +1,6 @@
-// api_service.dart (FULL UPDATED)
-
 import 'dart:convert';
 import 'dart:io';
+import 'dart:typed_data';
 
 import 'package:http/http.dart' as http;
 import 'package:shared_preferences/shared_preferences.dart';
@@ -50,6 +49,14 @@ class ApiService {
     return {"Authorization": "Bearer $token"};
   }
 
+  static Future<Map<String, String>> getAuthHeaders() async {
+    return _authHeaders();
+  }
+
+  static Future<Map<String, String>> getAuthImageHeaders() async {
+    return _authHeaders();
+  }
+
   // -------------------- AUTH --------------------
 
   static Future<Map<String, dynamic>> login({
@@ -63,7 +70,9 @@ class ApiService {
     );
 
     final data = _safeJson(res.body);
-    if (res.statusCode != 200) throw (data["message"] ?? "Login failed").toString();
+    if (res.statusCode != 200) {
+      throw (data["message"] ?? "Login failed").toString();
+    }
 
     final token = data["token"]?.toString();
     if (token != null && token.isNotEmpty) {
@@ -90,7 +99,9 @@ class ApiService {
     );
 
     final data = _safeJson(res.body);
-    if (res.statusCode != 200) throw (data["message"] ?? "Signup failed").toString();
+    if (res.statusCode != 200) {
+      throw (data["message"] ?? "Signup failed").toString();
+    }
 
     final token = data["token"]?.toString();
     if (token != null && token.isNotEmpty) {
@@ -110,8 +121,31 @@ class ApiService {
     );
 
     final data = _safeJson(res.body);
-    if (res.statusCode != 200) throw (data["message"] ?? "Failed to load profile").toString();
+    if (res.statusCode != 200) {
+      throw (data["message"] ?? "Failed to load profile").toString();
+    }
     return data;
+  }
+
+  static Future<Uint8List?> getMyProfilePhotoBytes() async {
+    final token = await getToken();
+    if (token == null) throw "Token missing. Please login again.";
+
+    final res = await http.get(
+      Uri.parse("$baseUrl/api/me/photo"),
+      headers: {
+        "Authorization": "Bearer $token",
+      },
+    );
+
+    if (res.statusCode == 404) return null;
+
+    if (res.statusCode != 200) {
+      final data = _safeJson(res.body);
+      throw (data["message"] ?? "Failed to load profile photo").toString();
+    }
+
+    return res.bodyBytes;
   }
 
   static Future<Map<String, dynamic>> uploadMyProfilePhoto({
@@ -130,7 +164,9 @@ class ApiService {
     final body = await streamed.stream.bytesToString();
     final data = _safeJson(body);
 
-    if (streamed.statusCode != 200) throw (data["message"] ?? "Failed to upload photo").toString();
+    if (streamed.statusCode != 200) {
+      throw (data["message"] ?? "Failed to upload photo").toString();
+    }
     return data;
   }
 
@@ -153,11 +189,13 @@ class ApiService {
     );
 
     final data = _safeJson(res.body);
-    if (res.statusCode != 200) throw (data["message"] ?? "Failed to change password").toString();
+    if (res.statusCode != 200) {
+      throw (data["message"] ?? "Failed to change password").toString();
+    }
     return data;
   }
 
-  // -------------------- TODDLERS (Parent) --------------------
+  // -------------------- TODDLERS (PARENT) --------------------
 
   static Future<List<dynamic>> getToddlers() async {
     final headers = await _authHeaders();
@@ -168,7 +206,9 @@ class ApiService {
     );
 
     final data = _safeJson(res.body);
-    if (res.statusCode != 200) throw (data["message"] ?? "Failed to load toddlers").toString();
+    if (res.statusCode != 200) {
+      throw (data["message"] ?? "Failed to load toddlers").toString();
+    }
 
     return (data["toddlers"] as List<dynamic>? ?? []);
   }
@@ -200,7 +240,9 @@ class ApiService {
     final body = await streamed.stream.bytesToString();
     final data = _safeJson(body);
 
-    if (streamed.statusCode != 200) throw (data["message"] ?? "Failed to create toddler").toString();
+    if (streamed.statusCode != 200) {
+      throw (data["message"] ?? "Failed to create toddler").toString();
+    }
     return data;
   }
 
@@ -213,7 +255,9 @@ class ApiService {
     );
 
     final data = _safeJson(res.body);
-    if (res.statusCode != 200) throw (data["message"] ?? "Failed to set active toddler").toString();
+    if (res.statusCode != 200) {
+      throw (data["message"] ?? "Failed to set active toddler").toString();
+    }
   }
 
   static Future<Map<String, dynamic>> getToddlerProgress(String toddlerId) async {
@@ -225,8 +269,142 @@ class ApiService {
     );
 
     final data = _safeJson(res.body);
-    if (res.statusCode != 200) throw (data["message"] ?? "Failed to load progress").toString();
+    if (res.statusCode != 200) {
+      throw (data["message"] ?? "Failed to load progress").toString();
+    }
 
+    return data;
+  }
+
+  // -------------------- STORY STUDIO --------------------
+
+  static String storyAudioUrl(String storyId) {
+    return absoluteUrl("/api/stories/$storyId/audio");
+  }
+
+  static Future<List<dynamic>> getStories() async {
+    final headers = await _authHeaders();
+
+    final res = await http.get(
+      Uri.parse("$baseUrl/api/stories"),
+      headers: headers,
+    );
+
+    final data = _safeJson(res.body);
+    if (res.statusCode != 200) {
+      throw (data["message"] ?? "Failed to load stories").toString();
+    }
+
+    return (data["stories"] as List<dynamic>? ?? []);
+  }
+
+  static Future<Map<String, dynamic>> createStory({
+    required String title,
+    required int durationSec,
+    required File audioFile,
+    String language = "Urdu",
+    bool isDraft = false,
+    String? toddlerId,
+  }) async {
+    final token = await getToken();
+    if (token == null) throw "Token missing. Please login again.";
+
+    final uri = Uri.parse("$baseUrl/api/stories");
+    final req = http.MultipartRequest("POST", uri);
+    req.headers["Authorization"] = "Bearer $token";
+
+    req.fields["title"] = title.trim();
+    req.fields["language"] = language;
+    req.fields["durationSec"] = durationSec.toString();
+    req.fields["isDraft"] = isDraft.toString();
+
+    if (toddlerId != null && toddlerId.trim().isNotEmpty) {
+      req.fields["toddlerId"] = toddlerId.trim();
+    }
+
+    req.files.add(await http.MultipartFile.fromPath("audio", audioFile.path));
+
+    final streamed = await req.send();
+    final body = await streamed.stream.bytesToString();
+    final data = _safeJson(body);
+
+    if (streamed.statusCode != 200) {
+      throw (data["message"] ?? "Failed to save story").toString();
+    }
+    return data;
+  }
+
+  static Future<Map<String, dynamic>> updateStory({
+    required String storyId,
+    required String title,
+    required int durationSec,
+    String language = "Urdu",
+    bool isDraft = false,
+    File? audioFile,
+  }) async {
+    final token = await getToken();
+    if (token == null) throw "Token missing. Please login again.";
+
+    final uri = Uri.parse("$baseUrl/api/stories/$storyId");
+    final req = http.MultipartRequest("PUT", uri);
+    req.headers["Authorization"] = "Bearer $token";
+
+    req.fields["title"] = title.trim();
+    req.fields["language"] = language;
+    req.fields["durationSec"] = durationSec.toString();
+    req.fields["isDraft"] = isDraft.toString();
+
+    if (audioFile != null) {
+      req.files.add(await http.MultipartFile.fromPath("audio", audioFile.path));
+    }
+
+    final streamed = await req.send();
+    final body = await streamed.stream.bytesToString();
+    final data = _safeJson(body);
+
+    if (streamed.statusCode != 200) {
+      throw (data["message"] ?? "Failed to update story").toString();
+    }
+    return data;
+  }
+
+  static Future<void> deleteStory(String storyId) async {
+    final headers = await _authHeaders();
+
+    final res = await http.delete(
+      Uri.parse("$baseUrl/api/stories/$storyId"),
+      headers: headers,
+    );
+
+    final data = _safeJson(res.body);
+    if (res.statusCode != 200) {
+      throw (data["message"] ?? "Failed to delete story").toString();
+    }
+  }
+
+  static Future<Map<String, dynamic>> assignStory({
+    required String storyId,
+    required bool assignToAll,
+    List<String> toddlerIds = const [],
+  }) async {
+    final headers = await _authHeaders();
+
+    final res = await http.put(
+      Uri.parse("$baseUrl/api/stories/$storyId/assign"),
+      headers: {
+        ...headers,
+        "Content-Type": "application/json",
+      },
+      body: jsonEncode({
+        "assignToAll": assignToAll,
+        "toddlerIds": toddlerIds,
+      }),
+    );
+
+    final data = _safeJson(res.body);
+    if (res.statusCode != 200) {
+      throw (data["message"] ?? "Failed to assign story").toString();
+    }
     return data;
   }
 
@@ -241,12 +419,14 @@ class ApiService {
     );
 
     final data = _safeJson(res.body);
-    if (res.statusCode != 200) throw (data["message"] ?? "Failed to load teacher dashboard").toString();
+    if (res.statusCode != 200) {
+      throw (data["message"] ?? "Failed to load teacher dashboard").toString();
+    }
 
     return data;
   }
 
-  // -------------------- TEACHER CLASSES (CRUD) --------------------
+  // -------------------- TEACHER CLASSES --------------------
 
   static Future<List<dynamic>> getTeacherClasses() async {
     final headers = await _authHeaders();
@@ -257,7 +437,9 @@ class ApiService {
     );
 
     final data = _safeJson(res.body);
-    if (res.statusCode != 200) throw (data["message"] ?? "Failed to load classes").toString();
+    if (res.statusCode != 200) {
+      throw (data["message"] ?? "Failed to load classes").toString();
+    }
 
     return (data["classes"] as List<dynamic>? ?? []);
   }
@@ -281,7 +463,9 @@ class ApiService {
     );
 
     final data = _safeJson(res.body);
-    if (res.statusCode != 200) throw (data["message"] ?? "Failed to create class").toString();
+    if (res.statusCode != 200) {
+      throw (data["message"] ?? "Failed to create class").toString();
+    }
 
     return data;
   }
@@ -306,7 +490,9 @@ class ApiService {
     );
 
     final data = _safeJson(res.body);
-    if (res.statusCode != 200) throw (data["message"] ?? "Failed to update class").toString();
+    if (res.statusCode != 200) {
+      throw (data["message"] ?? "Failed to update class").toString();
+    }
 
     return data;
   }
@@ -322,10 +508,12 @@ class ApiService {
     );
 
     final data = _safeJson(res.body);
-    if (res.statusCode != 200) throw (data["message"] ?? "Failed to delete class").toString();
+    if (res.statusCode != 200) {
+      throw (data["message"] ?? "Failed to delete class").toString();
+    }
   }
 
-  // -------------------- TEACHER EVENTS / MEETINGS (CRUD) --------------------
+  // -------------------- TEACHER EVENTS --------------------
 
   static Future<List<dynamic>> getTeacherEvents({
     int days = 7,
@@ -343,7 +531,9 @@ class ApiService {
     final res = await http.get(uri, headers: headers);
 
     final data = _safeJson(res.body);
-    if (res.statusCode != 200) throw (data["message"] ?? "Failed to load events").toString();
+    if (res.statusCode != 200) {
+      throw (data["message"] ?? "Failed to load events").toString();
+    }
 
     return (data["events"] as List<dynamic>? ?? []);
   }
@@ -369,7 +559,9 @@ class ApiService {
     );
 
     final data = _safeJson(res.body);
-    if (res.statusCode != 200) throw (data["message"] ?? "Failed to create event").toString();
+    if (res.statusCode != 200) {
+      throw (data["message"] ?? "Failed to create event").toString();
+    }
 
     return data;
   }
@@ -396,7 +588,9 @@ class ApiService {
     );
 
     final data = _safeJson(res.body);
-    if (res.statusCode != 200) throw (data["message"] ?? "Failed to update event").toString();
+    if (res.statusCode != 200) {
+      throw (data["message"] ?? "Failed to update event").toString();
+    }
 
     return data;
   }
@@ -412,10 +606,12 @@ class ApiService {
     );
 
     final data = _safeJson(res.body);
-    if (res.statusCode != 200) throw (data["message"] ?? "Failed to delete event").toString();
+    if (res.statusCode != 200) {
+      throw (data["message"] ?? "Failed to delete event").toString();
+    }
   }
 
-  // -------------------- TEACHER: TODDLERS + ASSIGN TO CLASS --------------------
+  // -------------------- TEACHER TODDLERS --------------------
 
   static Future<List<dynamic>> getAllToddlersForTeacher() async {
     final headers = await _authHeaders();
@@ -426,7 +622,9 @@ class ApiService {
     );
 
     final data = _safeJson(res.body);
-    if (res.statusCode != 200) throw (data["message"] ?? "Failed to load toddlers").toString();
+    if (res.statusCode != 200) {
+      throw (data["message"] ?? "Failed to load toddlers").toString();
+    }
 
     return (data["toddlers"] as List<dynamic>? ?? []);
   }
@@ -447,7 +645,9 @@ class ApiService {
     );
 
     final data = _safeJson(res.body);
-    if (res.statusCode != 200) throw (data["message"] ?? "Failed to assign class").toString();
+    if (res.statusCode != 200) {
+      throw (data["message"] ?? "Failed to assign class").toString();
+    }
 
     return data;
   }

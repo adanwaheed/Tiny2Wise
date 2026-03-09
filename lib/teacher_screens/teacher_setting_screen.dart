@@ -36,6 +36,9 @@ class _TeacherSettingScreenState extends State<TeacherSettingScreen> {
   // ✅ token cache for authenticated images
   String? _token;
 
+  // ✅ cache-bust for profile image (URL stays same /api/me/photo)
+  int _photoBust = 0;
+
   @override
   void initState() {
     super.initState();
@@ -43,7 +46,7 @@ class _TeacherSettingScreenState extends State<TeacherSettingScreen> {
   }
 
   Future<void> _init() async {
-    _token = await ApiService.getToken(); // ✅ read token once
+    _token = await ApiService.getToken();
     await _loadMe();
   }
 
@@ -77,7 +80,7 @@ class _TeacherSettingScreenState extends State<TeacherSettingScreen> {
   String get _photoUrl => (me?["photoUrl"] ?? "").toString();
   bool get _hasPhoto => (me?["hasPhoto"] ?? false) == true;
 
-  // ✅ FIXED: compress + resize image before upload
+  // ✅ FIXED: upload + refresh + cache-bust
   Future<void> _pickAndUploadImage() async {
     if (uploading) return;
 
@@ -103,15 +106,15 @@ class _TeacherSettingScreenState extends State<TeacherSettingScreen> {
 
       await ApiService.uploadMyProfilePhoto(photoFile: file);
 
-      // refresh token (in case cleared) + reload profile
       _token = await ApiService.getToken();
       await _loadMe();
 
-      // ✅ force refresh image cache for the same URL
-      if (mounted) {
-        imageCache.clear();
-        imageCache.clearLiveImages();
-      }
+      // ✅ force re-render with a new URL (cache-bust)
+      setState(() => _photoBust = DateTime.now().millisecondsSinceEpoch);
+
+      // ✅ also clear cache
+      imageCache.clear();
+      imageCache.clearLiveImages();
 
       _toast("Profile photo updated");
     } catch (e) {
@@ -238,6 +241,10 @@ class _TeacherSettingScreenState extends State<TeacherSettingScreen> {
         ? const <String, String>{}
         : <String, String>{"Authorization": "Bearer $_token"};
 
+    final profileImageUrl = _photoUrl.trim().isEmpty
+        ? ""
+        : ApiService.absoluteUrl("$_photoUrl?b=$_photoBust");
+
     return Scaffold(
       body: Container(
         decoration: const BoxDecoration(
@@ -262,7 +269,6 @@ class _TeacherSettingScreenState extends State<TeacherSettingScreen> {
                   style: TextStyle(color: dark, fontWeight: FontWeight.w900, fontSize: 14.5),
                 ),
                 const SizedBox(height: 14),
-
                 Center(
                   child: Column(
                     children: [
@@ -279,12 +285,22 @@ class _TeacherSettingScreenState extends State<TeacherSettingScreen> {
                                 color: const Color(0xFFF3F4F6),
                               ),
                               child: ClipOval(
-                                child: (_hasPhoto && _photoUrl.trim().isNotEmpty)
+                                child: (_hasPhoto && profileImageUrl.isNotEmpty)
                                     ? Image.network(
-                                  ApiService.absoluteUrl(_photoUrl),
+                                  profileImageUrl,
                                   fit: BoxFit.cover,
-                                  headers: authHeaders, // ✅ IMPORTANT FIX
+                                  headers: authHeaders,
                                   errorBuilder: (_, __, ___) => Container(color: const Color(0xFFF3F4F6)),
+                                  loadingBuilder: (context, child, progress) {
+                                    if (progress == null) return child;
+                                    return const Center(
+                                      child: SizedBox(
+                                        width: 18,
+                                        height: 18,
+                                        child: CircularProgressIndicator(strokeWidth: 2),
+                                      ),
+                                    );
+                                  },
                                 )
                                     : Container(color: const Color(0xFFF3F4F6)),
                               ),
@@ -327,7 +343,6 @@ class _TeacherSettingScreenState extends State<TeacherSettingScreen> {
                     ],
                   ),
                 ),
-
                 const SizedBox(height: 18),
 
                 const Text("DATA & PRIVACY", style: TextStyle(color: grey, fontWeight: FontWeight.w900, fontSize: 11.5)),

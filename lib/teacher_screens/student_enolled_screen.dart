@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import '../services/api_service.dart';
 import 'teacher_setting_screen.dart';
 
@@ -27,10 +28,18 @@ class _StudentEnolledScreenState extends State<StudentEnolledScreen> {
   // ✅ keep Students selected/green on this screen
   int _navIndex = 2;
 
+  // ✅ token cache for authenticated toddler photos
+  String? _token;
+
   @override
   void initState() {
     super.initState();
-    _loadAll();
+    _init();
+  }
+
+  Future<void> _init() async {
+    _token = await ApiService.getToken();
+    await _loadAll();
   }
 
   void _toast(String msg) {
@@ -54,6 +63,10 @@ class _StudentEnolledScreenState extends State<StudentEnolledScreen> {
 
       toddlers = t.cast<Map<String, dynamic>>();
       classes = c.cast<Map<String, dynamic>>();
+
+      // ✅ clear cache so latest uploaded photos show (optional but useful)
+      imageCache.clear();
+      imageCache.clearLiveImages();
     } catch (e) {
       _toast("$e");
     } finally {
@@ -219,6 +232,10 @@ class _StudentEnolledScreenState extends State<StudentEnolledScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final authHeaders = (_token == null || _token!.isEmpty)
+        ? const <String, String>{}
+        : <String, String>{"Authorization": "Bearer $_token"};
+
     return Scaffold(
       body: Container(
         decoration: const BoxDecoration(
@@ -284,7 +301,10 @@ class _StudentEnolledScreenState extends State<StudentEnolledScreen> {
                   ...toddlers.map(
                         (t) => Padding(
                       padding: const EdgeInsets.only(bottom: 12),
-                      child: _profileCard(t),
+                      child: _profileCard(
+                        t,
+                        authHeaders: authHeaders,
+                      ),
                     ),
                   ),
               ],
@@ -298,11 +318,19 @@ class _StudentEnolledScreenState extends State<StudentEnolledScreen> {
     );
   }
 
-  Widget _profileCard(Map<String, dynamic> t) {
+  Widget _profileCard(
+      Map<String, dynamic> t, {
+        required Map<String, String> authHeaders,
+      }) {
     final name = (t["name"] ?? "Child").toString();
     final age = _ageLabel(t["age"]);
-    final photoUrl = (t["photoUrl"] ?? "").toString();
+
+    final raw = (t["photoUrl"] ?? t["imageUrl"] ?? "").toString();
     final hasPhoto = (t["hasPhoto"] ?? false) == true;
+
+    // ✅ cache-bust so new uploads show immediately (use updatedAt/createdAt)
+    final bust = (t["updatedAt"] ?? t["createdAt"] ?? "").toString();
+    final photoUrl = raw.trim().isEmpty ? "" : ApiService.absoluteUrl("$raw?b=$bust");
 
     final assignedClass = _findAssignedClassForToddler(t["_id"]?.toString() ?? "");
     final assignedTitle = assignedClass == null ? "Unassigned" : (assignedClass["title"] ?? "Class").toString();
@@ -326,7 +354,7 @@ class _StudentEnolledScreenState extends State<StudentEnolledScreen> {
         padding: const EdgeInsets.all(12),
         child: Row(
           children: [
-            // ✅ no profile icon; image only, else blank grey circle
+            // ✅ IMAGE LIKE PARENT DASHBOARD (Authorization header)
             Container(
               width: 52,
               height: 52,
@@ -336,11 +364,22 @@ class _StudentEnolledScreenState extends State<StudentEnolledScreen> {
                 color: const Color(0xFFF3F4F6),
               ),
               child: ClipOval(
-                child: hasPhoto && photoUrl.trim().isNotEmpty
+                child: (hasPhoto && photoUrl.isNotEmpty)
                     ? Image.network(
-                  ApiService.absoluteUrl(photoUrl),
+                  photoUrl,
                   fit: BoxFit.cover,
+                  headers: authHeaders,
                   errorBuilder: (_, __, ___) => Container(color: const Color(0xFFF3F4F6)),
+                  loadingBuilder: (context, child, progress) {
+                    if (progress == null) return child;
+                    return const Center(
+                      child: SizedBox(
+                        width: 18,
+                        height: 18,
+                        child: CircularProgressIndicator(strokeWidth: 2),
+                      ),
+                    );
+                  },
                 )
                     : Container(color: const Color(0xFFF3F4F6)),
               ),
@@ -384,7 +423,7 @@ class _StudentEnolledScreenState extends State<StudentEnolledScreen> {
             index: 0,
             icon: Icons.home_rounded,
             label: "Home",
-            onTap: () => Navigator.pop(context, true), // go back to dashboard
+            onTap: () => Navigator.pop(context, true),
           ),
           _navItem(
             index: 1,

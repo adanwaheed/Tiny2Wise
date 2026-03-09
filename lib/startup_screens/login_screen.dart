@@ -246,7 +246,7 @@ class _LoginScreenState extends State<LoginScreen> {
 
                           _InputField(
                             controller: emailController,
-                            hint: "parent@gmail.com",
+                            hint: "your@gmail.com",
                             prefixIcon: Icons.mail_outline,
                             obscure: false,
                           ),

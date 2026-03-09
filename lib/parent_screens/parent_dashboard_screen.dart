@@ -3,7 +3,10 @@ import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:image_picker/image_picker.dart';
+
 import '../services/api_service.dart';
+import 'parent_setting_screen.dart';
+import 'story_telling_screen.dart';
 
 class ParentDashboardScreen extends StatefulWidget {
   final String parentName;
@@ -173,6 +176,29 @@ class _ParentDashboardScreenState extends State<ParentDashboardScreen>
     }
   }
 
+  void _openSettings() {
+    Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (_) => ParentSettingScreen(
+          onHomeTap: () {
+            Navigator.pop(context);
+          },
+          onActivityTap: () {
+            // add your activity screen navigation here
+          },
+          onBookmarkTap: () {
+            // add your bookmark screen navigation here
+          },
+          onSettingsTap: () {},
+          onCenterTap: () {
+            // add your center button action here
+          },
+        ),
+      ),
+    );
+  }
+
   // -------------------- UI --------------------
 
   @override
@@ -196,9 +222,23 @@ class _ParentDashboardScreenState extends State<ParentDashboardScreen>
       child: Scaffold(
         backgroundColor: bg,
         bottomNavigationBar: _BottomNav(
+          activeIndex: 0, // ✅ Home active on dashboard
           onCenterTap: () {
             HapticFeedback.lightImpact();
             _toast("Center + tapped");
+          },
+          onHomeTap: () => HapticFeedback.selectionClick(),
+          onActivityTap: () {
+            HapticFeedback.selectionClick();
+            _toast("Activity coming soon");
+          },
+          onBookmarkTap: () {
+            HapticFeedback.selectionClick();
+            _toast("Bookmarks coming soon");
+          },
+          onSettingsTap: () {
+            HapticFeedback.selectionClick();
+            _openSettings();
           },
         ),
         body: SafeArea(
@@ -541,7 +581,12 @@ class _ParentDashboardScreenState extends State<ParentDashboardScreen>
                             borderColor: border,
                             onTap: () {
                               HapticFeedback.selectionClick();
-                              _toast("Story Telling");
+                              Navigator.push(
+                                context,
+                                MaterialPageRoute(
+                                  builder: (_) => const StoryTellingScreen(),
+                                ),
+                              );
                             },
                           ),
                         ),
@@ -1073,11 +1118,25 @@ class _ActivityCard extends StatelessWidget {
   }
 }
 
+// ✅ UPDATED: Bottom bar now supports navigation + active icon (Home active here)
 class _BottomNav extends StatelessWidget {
+  final int activeIndex; // 0 home, 1 activity, 2 bookmark, 3 settings
   final VoidCallback onCenterTap;
+  final VoidCallback onHomeTap;
+  final VoidCallback onActivityTap;
+  final VoidCallback onBookmarkTap;
+  final VoidCallback onSettingsTap;
+
   static const Color green = Color(0xFF27C267);
 
-  const _BottomNav({required this.onCenterTap});
+  const _BottomNav({
+    required this.activeIndex,
+    required this.onCenterTap,
+    required this.onHomeTap,
+    required this.onActivityTap,
+    required this.onBookmarkTap,
+    required this.onSettingsTap,
+  });
 
   @override
   Widget build(BuildContext context) {
@@ -1094,11 +1153,11 @@ class _BottomNav extends StatelessWidget {
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
-              _NavIcon(icon: Icons.home_rounded, active: true, onTap: () => HapticFeedback.selectionClick()),
-              _NavIcon(icon: Icons.bar_chart_rounded, active: false, onTap: () => HapticFeedback.selectionClick()),
+              _NavIcon(icon: Icons.home_rounded, active: activeIndex == 0, onTap: onHomeTap),
+              _NavIcon(icon: Icons.bar_chart_rounded, active: activeIndex == 1, onTap: onActivityTap),
               const SizedBox(width: 46),
-              _NavIcon(icon: Icons.bookmark_border_rounded, active: false, onTap: () => HapticFeedback.selectionClick()),
-              _NavIcon(icon: Icons.settings_rounded, active: false, onTap: () => HapticFeedback.selectionClick()),
+              _NavIcon(icon: Icons.bookmark_border_rounded, active: activeIndex == 2, onTap: onBookmarkTap),
+              _NavIcon(icon: Icons.settings_rounded, active: activeIndex == 3, onTap: onSettingsTap),
             ],
           ),
           Positioned(
