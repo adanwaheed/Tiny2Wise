@@ -3,6 +3,7 @@ import '../services/api_service.dart';
 import 'teacher_meetings_screen.dart';
 import 'student_enolled_screen.dart';
 import 'teacher_setting_screen.dart';
+import 'student_activity_screen.dart';
 
 class TeacherDashboardScreen extends StatefulWidget {
   final String teacherName;
@@ -356,7 +357,7 @@ class _TeacherDashboardScreenState extends State<TeacherDashboardScreen> {
                                 filled: true,
                                 icon: Icons.add_rounded,
                                 text: "New Assignment",
-                                onTap: () => _toast(classes.isEmpty ? "Create a class first" : "Assignment feature coming soon"),
+                                onTap: () => classes.isEmpty ? _toast("Create a class first") : _openActivityScreen(),
                               ),
                             ),
                             const SizedBox(width: 10),
@@ -471,9 +472,10 @@ class _TeacherDashboardScreenState extends State<TeacherDashboardScreen> {
             index: 1,
             icon: Icons.bar_chart_rounded,
             label: "Activity",
-            onTap: () {
+            onTap: () async {
               setState(() => _navIndex = 1);
-              _toast("Activity coming soon");
+              await _openActivityScreen();
+              if (mounted) setState(() => _navIndex = 0);
             },
           ),
           _navItem(
@@ -805,5 +807,16 @@ class _TeacherDashboardScreenState extends State<TeacherDashboardScreen> {
         ),
       ),
     );
+  }
+
+  Future<void> _openActivityScreen() async {
+    final changed = await Navigator.push<bool>(
+      context,
+      MaterialPageRoute(builder: (_) => const StudentActivityScreen()),
+    );
+
+    if (changed == true) {
+      await _loadDashboard();
+    }
   }
 }

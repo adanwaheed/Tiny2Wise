@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'login_screen.dart';
+import 'signup_screen.dart';
 
 class OnboardingScreen extends StatefulWidget {
   const OnboardingScreen({super.key});
@@ -116,7 +117,12 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
                       ),
                     ),
                     onPressed: () {
-                      // TODO: Navigate to your next screen
+                      Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                          builder: (_) => const SignupScreen(),
+                        ),
+                      );
                     },
                     child: const Row(
                       mainAxisAlignment: MainAxisAlignment.center,

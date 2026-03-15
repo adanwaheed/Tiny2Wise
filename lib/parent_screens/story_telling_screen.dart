@@ -8,10 +8,25 @@ import 'package:path_provider/path_provider.dart';
 import 'package:permission_handler/permission_handler.dart';
 import 'package:record/record.dart';
 
+import 'parent_setting_screen.dart';
+
 import '../services/api_service.dart';
 
 class StoryTellingScreen extends StatefulWidget {
-  const StoryTellingScreen({super.key});
+  final VoidCallback? onHomeTap;
+  final VoidCallback? onActivityTap;
+  final VoidCallback? onBookmarkTap;
+  final VoidCallback? onSettingsTap;
+  final VoidCallback? onCenterTap;
+
+  const StoryTellingScreen({
+    super.key,
+    this.onHomeTap,
+    this.onActivityTap,
+    this.onBookmarkTap,
+    this.onSettingsTap,
+    this.onCenterTap,
+  });
 
   @override
   State<StoryTellingScreen> createState() => _StoryTellingScreenState();
@@ -24,7 +39,6 @@ class _StoryTellingScreenState extends State<StoryTellingScreen> {
   static const Color lightText = Color(0xFF8892A0);
   static const Color green = Color(0xFF18F400);
   static const Color border = Color(0xFFE8E8E8);
-  static const Color navy = Color(0xFF081224);
 
   final AudioRecorder _recorder = AudioRecorder();
   final AudioPlayer _player = AudioPlayer();
@@ -611,7 +625,7 @@ class _StoryTellingScreenState extends State<StoryTellingScreen> {
         border: Border.all(color: border),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withValues(alpha: 0.03),
+            color: Colors.black.withOpacity(0.03),
             blurRadius: 10,
             offset: const Offset(0, 4),
           ),
@@ -811,54 +825,39 @@ class _StoryTellingScreenState extends State<StoryTellingScreen> {
     );
   }
 
-  Widget _buildBottomBar() {
-    return Container(
-      height: 78,
-      decoration: const BoxDecoration(
-        color: navy,
-        borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
-      ),
-      child: Stack(
-        clipBehavior: Clip.none,
-        alignment: Alignment.topCenter,
-        children: [
-          Positioned(
-            top: -19,
-            child: Container(
-              width: 52,
-              height: 52,
-              decoration: const BoxDecoration(
-                color: Color(0xFF22C55E),
-                shape: BoxShape.circle,
-              ),
-              child: const Icon(Icons.add, color: Colors.white, size: 30),
-            ),
-          ),
-          Positioned.fill(
-            child: Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 22),
-              child: Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                children: const [
-                  Icon(Icons.home_outlined, color: Color(0xFF22C55E)),
-                  Icon(Icons.bar_chart, color: Colors.white70),
-                  SizedBox(width: 42),
-                  Icon(Icons.bookmark_border, color: Colors.white70),
-                  Icon(Icons.settings_outlined, color: Colors.white70),
-                ],
-              ),
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
   @override
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: bg,
-      bottomNavigationBar: _buildBottomBar(),
+      bottomNavigationBar: _ParentBottomBar(
+        activeIndex: 0,
+        onHomeTap: widget.onHomeTap ??
+                () {
+              Navigator.pop(context);
+            },
+        onActivityTap: widget.onActivityTap,
+        onBookmarkTap: widget.onBookmarkTap,
+        onSettingsTap: widget.onSettingsTap ??
+                () {
+              Navigator.push(
+                context,
+                MaterialPageRoute(
+                  builder: (_) => ParentSettingScreen(
+                    onHomeTap: () {
+                      Navigator.pop(context);
+                    },
+                    onActivityTap: () {
+                      Navigator.pop(context);
+                    },
+                    onBookmarkTap: () {},
+                    onSettingsTap: () {},
+                    onCenterTap: () {},
+                  ),
+                ),
+              );
+            },
+        onCenterTap: widget.onCenterTap,
+      ),
       appBar: AppBar(
         backgroundColor: bg,
         elevation: 0,
@@ -961,7 +960,7 @@ class _StoryTellingScreenState extends State<StoryTellingScreen> {
                         borderRadius: BorderRadius.circular(18),
                         boxShadow: [
                           BoxShadow(
-                            color: Colors.black.withValues(alpha: 0.14),
+                            color: Colors.black.withOpacity(0.14),
                             blurRadius: 14,
                             offset: const Offset(0, 8),
                           ),
@@ -1028,6 +1027,164 @@ class _StoryTellingScreenState extends State<StoryTellingScreen> {
               ..._stories.map(_buildStoryCard),
             const SizedBox(height: 20),
           ],
+        ),
+      ),
+    );
+  }
+}
+
+class _ParentBottomBar extends StatelessWidget {
+  final int activeIndex;
+  final VoidCallback? onHomeTap;
+  final VoidCallback? onActivityTap;
+  final VoidCallback? onBookmarkTap;
+  final VoidCallback? onSettingsTap;
+  final VoidCallback? onCenterTap;
+
+  static const Color green = Color(0xFF22C55E);
+
+  const _ParentBottomBar({
+    required this.activeIndex,
+    this.onHomeTap,
+    this.onActivityTap,
+    this.onBookmarkTap,
+    this.onSettingsTap,
+    this.onCenterTap,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      height: 78,
+      padding: const EdgeInsets.only(left: 18, right: 18, bottom: 10, top: 10),
+      decoration: const BoxDecoration(
+        color: Color(0xFF0F1D14),
+        borderRadius: BorderRadius.vertical(top: Radius.circular(22)),
+      ),
+      child: Stack(
+        alignment: Alignment.center,
+        children: [
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              _NavIcon(
+                icon: Icons.home_rounded,
+                active: activeIndex == 0,
+                onTap: onHomeTap,
+              ),
+              _NavIcon(
+                icon: Icons.bar_chart_rounded,
+                active: activeIndex == 1,
+                onTap: onActivityTap,
+              ),
+              const SizedBox(width: 46),
+              _NavIcon(
+                icon: Icons.bookmark_border_rounded,
+                active: activeIndex == 2,
+                onTap: onBookmarkTap,
+              ),
+              _NavIcon(
+                icon: Icons.settings_rounded,
+                active: activeIndex == 3,
+                onTap: onSettingsTap,
+              ),
+            ],
+          ),
+          Positioned(
+            bottom: 10,
+            child: _Pressable(
+              onTap: onCenterTap,
+              borderRadius: BorderRadius.circular(999),
+              child: Container(
+                width: 52,
+                height: 52,
+                decoration: BoxDecoration(
+                  color: green,
+                  shape: BoxShape.circle,
+                  boxShadow: [
+                    BoxShadow(
+                      color: green.withOpacity(0.35),
+                      blurRadius: 18,
+                      offset: const Offset(0, 10),
+                    ),
+                  ],
+                ),
+                child: const Icon(Icons.add_rounded, color: Colors.white, size: 26),
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _NavIcon extends StatelessWidget {
+  final IconData icon;
+  final bool active;
+  final VoidCallback? onTap;
+
+  const _NavIcon({
+    required this.icon,
+    required this.active,
+    this.onTap,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return _Pressable(
+      onTap: onTap,
+      borderRadius: BorderRadius.circular(14),
+      child: SizedBox(
+        width: 34,
+        height: 34,
+        child: Icon(
+          icon,
+          size: 22,
+          color: active ? const Color(0xFF22C55E) : Colors.white70,
+        ),
+      ),
+    );
+  }
+}
+
+class _Pressable extends StatefulWidget {
+  final Widget child;
+  final VoidCallback? onTap;
+  final BorderRadius borderRadius;
+
+  const _Pressable({
+    required this.child,
+    this.onTap,
+    required this.borderRadius,
+  });
+
+  @override
+  State<_Pressable> createState() => _PressableState();
+}
+
+class _PressableState extends State<_Pressable> {
+  bool _down = false;
+
+  void _setDown(bool v) {
+    if (!mounted) return;
+    setState(() => _down = v);
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return AnimatedScale(
+      scale: _down ? 0.98 : 1,
+      duration: const Duration(milliseconds: 110),
+      child: Material(
+        color: Colors.transparent,
+        child: InkWell(
+          borderRadius: widget.borderRadius,
+          onTap: widget.onTap,
+          onTapDown: (_) => _setDown(true),
+          onTapUp: (_) => _setDown(false),
+          onTapCancel: () => _setDown(false),
+          child: widget.child,
         ),
       ),
     );

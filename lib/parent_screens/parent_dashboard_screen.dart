@@ -7,6 +7,7 @@ import 'package:image_picker/image_picker.dart';
 import '../services/api_service.dart';
 import 'parent_setting_screen.dart';
 import 'story_telling_screen.dart';
+import 'assigned_activities_screen.dart';
 
 class ParentDashboardScreen extends StatefulWidget {
   final String parentName;
@@ -29,6 +30,9 @@ class _ParentDashboardScreenState extends State<ParentDashboardScreen>
   bool loading = true;
   List<dynamic> toddlers = [];
   String? activeToddlerId;
+
+  List<Map<String, dynamic>> teacherAssignments = [];
+  bool assignmentsLoading = false;
 
   double speechAccuracy = 0; // 0-100
   String progressNote = "Loading...";
@@ -63,6 +67,69 @@ class _ParentDashboardScreenState extends State<ParentDashboardScreen>
     super.dispose();
   }
 
+  Future<void> _loadAssignedActivities(String toddlerId) async {
+    setState(() => assignmentsLoading = true);
+    try {
+      final list = await ApiService.getToddlerAssignedActivities(toddlerId);
+      teacherAssignments = list.map((e) => Map<String, dynamic>.from(e as Map)).toList();
+    } catch (_) {
+      teacherAssignments = [];
+    } finally {
+      if (mounted) setState(() => assignmentsLoading = false);
+    }
+  }
+
+  void _openAssignedActivities() {
+    if (activeToddlerId == null) {
+      _toast("Select a child first");
+      return;
+    }
+
+    Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (_) => AssignedActivitiesScreen(
+          toddlerId: activeToddlerId!,
+          toddlerName: _activeName(),
+        ),
+      ),
+    ).then((_) {
+      if (activeToddlerId != null) {
+        _loadAssignedActivities(activeToddlerId!);
+      }
+    });
+  }
+
+  String _teacherActivityTitle(String type) {
+    switch (type) {
+      case "speech_practice":
+        return "Speech Practice";
+      case "puzzle_game":
+        return "Puzzle/Game";
+      case "mock_test":
+        return "Mock Test";
+      case "story_telling":
+        return "Story Telling Mode";
+      default:
+        return "Activity";
+    }
+  }
+
+  IconData _teacherActivityIcon(String type) {
+    switch (type) {
+      case "speech_practice":
+        return Icons.menu_book_rounded;
+      case "puzzle_game":
+        return Icons.extension_rounded;
+      case "mock_test":
+        return Icons.assignment_outlined;
+      case "story_telling":
+        return Icons.mic_rounded;
+      default:
+        return Icons.circle;
+    }
+  }
+
   Future<void> _loadToddlers() async {
     setState(() => loading = true);
     try {
@@ -77,10 +144,12 @@ class _ParentDashboardScreenState extends State<ParentDashboardScreen>
       if (toddlers.isNotEmpty) {
         activeToddlerId = (active["_id"] ?? active["\u005fid"]).toString();
         await _loadProgress(activeToddlerId!);
+        await _loadAssignedActivities(activeToddlerId!);
       } else {
         activeToddlerId = null;
         speechAccuracy = 0;
         progressNote = "Add a child to see progress.";
+        teacherAssignments = [];
       }
     } catch (e) {
       _toast("Failed: $e");
@@ -118,6 +187,7 @@ class _ParentDashboardScreenState extends State<ParentDashboardScreen>
 
       setState(() {});
       await _loadProgress(toddlerId);
+      await _loadAssignedActivities(toddlerId);
     } catch (e) {
       _toast("Failed: $e");
     }
@@ -192,7 +262,8 @@ class _ParentDashboardScreenState extends State<ParentDashboardScreen>
           },
           onSettingsTap: () {},
           onCenterTap: () {
-            // add your center button action here
+            HapticFeedback.lightImpact();
+            _openAssignedActivities();
           },
         ),
       ),
@@ -222,10 +293,10 @@ class _ParentDashboardScreenState extends State<ParentDashboardScreen>
       child: Scaffold(
         backgroundColor: bg,
         bottomNavigationBar: _BottomNav(
-          activeIndex: 0, // ✅ Home active on dashboard
+          activeIndex: 0,
           onCenterTap: () {
             HapticFeedback.lightImpact();
-            _toast("Center + tapped");
+            _openAssignedActivities();
           },
           onHomeTap: () => HapticFeedback.selectionClick(),
           onActivityTap: () {
@@ -240,6 +311,7 @@ class _ParentDashboardScreenState extends State<ParentDashboardScreen>
             HapticFeedback.selectionClick();
             _openSettings();
           },
+          centerBadgeCount: teacherAssignments.length,
         ),
         body: SafeArea(
           child: loading
@@ -528,7 +600,102 @@ class _ParentDashboardScreenState extends State<ParentDashboardScreen>
                     ),
 
                     const SizedBox(height: 18),
+                    Row(
+                      children: [
+                        const Text(
+                          "Teacher Assigned Activities",
+                          style: TextStyle(
+                            color: dark,
+                            fontSize: 14,
+                            fontWeight: FontWeight.w900,
+                          ),
+                        ),
+                        const Spacer(),
+                        _TextChipButton(
+                          label: "View All",
+                          onTap: _openAssignedActivities,
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 10),
 
+                    if (assignmentsLoading)
+                      const Padding(
+                        padding: EdgeInsets.symmetric(vertical: 18),
+                        child: Center(child: CircularProgressIndicator(color: green)),
+                      )
+                    else if (teacherAssignments.isEmpty)
+                      Container(
+                        width: double.infinity,
+                        padding: const EdgeInsets.all(14),
+                        decoration: BoxDecoration(
+                          color: Colors.white,
+                          borderRadius: BorderRadius.circular(18),
+                          border: Border.all(color: border),
+                        ),
+                        child: const Text(
+                          "No teacher-assigned activities for this child yet.",
+                          style: TextStyle(
+                            color: grey,
+                            fontSize: 12.5,
+                            fontWeight: FontWeight.w700,
+                          ),
+                        ),
+                      )
+                    else
+                      ...teacherAssignments.take(2).map(
+                            (item) => Padding(
+                          padding: const EdgeInsets.only(bottom: 10),
+                          child: Container(
+                            width: double.infinity,
+                            padding: const EdgeInsets.all(14),
+                            decoration: BoxDecoration(
+                              color: Colors.white,
+                              borderRadius: BorderRadius.circular(18),
+                              border: Border.all(color: border),
+                            ),
+                            child: Row(
+                              children: [
+                                CircleAvatar(
+                                  radius: 18,
+                                  backgroundColor: green.withOpacity(0.12),
+                                  child: Icon(
+                                    _teacherActivityIcon((item["activityType"] ?? "").toString()),
+                                    color: green,
+                                  ),
+                                ),
+                                const SizedBox(width: 12),
+                                Expanded(
+                                  child: Column(
+                                    crossAxisAlignment: CrossAxisAlignment.start,
+                                    children: [
+                                      Text(
+                                        _teacherActivityTitle((item["activityType"] ?? "").toString()),
+                                        style: const TextStyle(
+                                          color: dark,
+                                          fontSize: 13.5,
+                                          fontWeight: FontWeight.w900,
+                                        ),
+                                      ),
+                                      const SizedBox(height: 4),
+                                      Text(
+                                        "By ${(item["teacherName"] ?? "Teacher").toString()}",
+                                        style: const TextStyle(
+                                          color: grey,
+                                          fontSize: 11.8,
+                                          fontWeight: FontWeight.w700,
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                        ),
+                      ),
+
+                    const SizedBox(height: 18),
                     const Text(
                       "Start an Activity",
                       style: TextStyle(color: dark, fontSize: 14, fontWeight: FontWeight.w900),
@@ -1118,14 +1285,14 @@ class _ActivityCard extends StatelessWidget {
   }
 }
 
-// ✅ UPDATED: Bottom bar now supports navigation + active icon (Home active here)
 class _BottomNav extends StatelessWidget {
-  final int activeIndex; // 0 home, 1 activity, 2 bookmark, 3 settings
+  final int activeIndex;
   final VoidCallback onCenterTap;
   final VoidCallback onHomeTap;
   final VoidCallback onActivityTap;
   final VoidCallback onBookmarkTap;
   final VoidCallback onSettingsTap;
+  final int centerBadgeCount;
 
   static const Color green = Color(0xFF27C267);
 
@@ -1136,6 +1303,7 @@ class _BottomNav extends StatelessWidget {
     required this.onActivityTap,
     required this.onBookmarkTap,
     required this.onSettingsTap,
+    this.centerBadgeCount = 0,
   });
 
   @override
@@ -1153,11 +1321,27 @@ class _BottomNav extends StatelessWidget {
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
-              _NavIcon(icon: Icons.home_rounded, active: activeIndex == 0, onTap: onHomeTap),
-              _NavIcon(icon: Icons.bar_chart_rounded, active: activeIndex == 1, onTap: onActivityTap),
+              _NavIcon(
+                icon: Icons.home_rounded,
+                active: activeIndex == 0,
+                onTap: onHomeTap,
+              ),
+              _NavIcon(
+                icon: Icons.bar_chart_rounded,
+                active: activeIndex == 1,
+                onTap: onActivityTap,
+              ),
               const SizedBox(width: 46),
-              _NavIcon(icon: Icons.bookmark_border_rounded, active: activeIndex == 2, onTap: onBookmarkTap),
-              _NavIcon(icon: Icons.settings_rounded, active: activeIndex == 3, onTap: onSettingsTap),
+              _NavIcon(
+                icon: Icons.bookmark_border_rounded,
+                active: activeIndex == 2,
+                onTap: onBookmarkTap,
+              ),
+              _NavIcon(
+                icon: Icons.settings_rounded,
+                active: activeIndex == 3,
+                onTap: onSettingsTap,
+              ),
             ],
           ),
           Positioned(
@@ -1165,21 +1349,51 @@ class _BottomNav extends StatelessWidget {
             child: _Pressable(
               onTap: onCenterTap,
               borderRadius: BorderRadius.circular(999),
-              child: Container(
-                width: 52,
-                height: 52,
-                decoration: BoxDecoration(
-                  color: green,
-                  shape: BoxShape.circle,
-                  boxShadow: [
-                    BoxShadow(
-                      color: green.withOpacity(0.35),
-                      blurRadius: 18,
-                      offset: const Offset(0, 10),
-                    )
-                  ],
-                ),
-                child: const Icon(Icons.add_rounded, color: Colors.white, size: 26),
+              child: Stack(
+                clipBehavior: Clip.none,
+                children: [
+                  Container(
+                    width: 52,
+                    height: 52,
+                    decoration: BoxDecoration(
+                      color: green,
+                      shape: BoxShape.circle,
+                      boxShadow: [
+                        BoxShadow(
+                          color: green.withOpacity(0.35),
+                          blurRadius: 18,
+                          offset: const Offset(0, 10),
+                        ),
+                      ],
+                    ),
+                    child: const Icon(
+                      Icons.add_rounded,
+                      color: Colors.white,
+                      size: 26,
+                    ),
+                  ),
+                  if (centerBadgeCount > 0)
+                    Positioned(
+                      right: -2,
+                      top: -2,
+                      child: Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                        decoration: BoxDecoration(
+                          color: Colors.red,
+                          borderRadius: BorderRadius.circular(999),
+                          border: Border.all(color: Colors.white, width: 2),
+                        ),
+                        child: Text(
+                          centerBadgeCount > 9 ? "9+" : "$centerBadgeCount",
+                          style: const TextStyle(
+                            color: Colors.white,
+                            fontSize: 10,
+                            fontWeight: FontWeight.w900,
+                          ),
+                        ),
+                      ),
+                    ),
+                ],
               ),
             ),
           ),

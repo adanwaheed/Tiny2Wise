@@ -651,4 +651,165 @@ class ApiService {
 
     return data;
   }
+
+  // -------------------- TEACHER ACTIVITIES --------------------
+
+  static Future<Map<String, dynamic>> getTeacherActivityTargets() async {
+    final headers = await _authHeaders();
+
+    final res = await http.get(
+      Uri.parse("$baseUrl/api/teacher/activity-targets"),
+      headers: headers,
+    );
+
+    final data = _safeJson(res.body);
+    if (res.statusCode != 200) {
+      throw (data["message"] ?? "Failed to load activity targets").toString();
+    }
+
+    return data;
+  }
+
+  static Future<Map<String, dynamic>> assignTeacherActivity({
+    required String activityType,
+    required String targetType,
+    String? classId,
+    List<String> toddlerIds = const [],
+    String title = "",
+    String description = "",
+  }) async {
+    final headers = await _authHeaders();
+
+    final res = await http.post(
+      Uri.parse("$baseUrl/api/teacher/activities/assign"),
+      headers: {
+        ...headers,
+        "Content-Type": "application/json",
+      },
+      body: jsonEncode({
+        "activityType": activityType,
+        "targetType": targetType,
+        "classId": classId,
+        "toddlerIds": toddlerIds,
+        "title": title,
+        "description": description,
+      }),
+    );
+
+    final data = _safeJson(res.body);
+    if (res.statusCode != 200) {
+      throw (data["message"] ?? "Failed to assign activity").toString();
+    }
+
+    return data;
+  }
+
+  static Future<List<dynamic>> getTeacherAssignedActivities({
+    int limit = 20,
+  }) async {
+    final headers = await _authHeaders();
+
+    final uri = Uri.parse("$baseUrl/api/teacher/activities").replace(
+      queryParameters: {"limit": limit.toString()},
+    );
+
+    final res = await http.get(uri, headers: headers);
+    final data = _safeJson(res.body);
+
+    if (res.statusCode != 200) {
+      throw (data["message"] ?? "Failed to load teacher assignments").toString();
+    }
+
+    return (data["assignments"] as List<dynamic>? ?? []);
+  }
+
+  static Future<List<dynamic>> getToddlerAssignedActivities(String toddlerId) async {
+    final headers = await _authHeaders();
+
+    final res = await http.get(
+      Uri.parse("$baseUrl/api/toddlers/$toddlerId/assigned-activities"),
+      headers: headers,
+    );
+
+    final data = _safeJson(res.body);
+    if (res.statusCode != 200) {
+      throw (data["message"] ?? "Failed to load assigned activities").toString();
+    }
+
+    return (data["assignments"] as List<dynamic>? ?? []);
+  }
+
+  static Future<Map<String, dynamic>> completeAssignedActivity(String assignmentId) async {
+    final headers = await _authHeaders();
+
+    final res = await http.put(
+      Uri.parse("$baseUrl/api/parent/assigned-activities/$assignmentId/complete"),
+      headers: {
+        ...headers,
+        "Content-Type": "application/json",
+      },
+    );
+
+    final data = _safeJson(res.body);
+    if (res.statusCode != 200) {
+      throw (data["message"] ?? "Failed to complete activity").toString();
+    }
+
+    return data;
+  }
+
+  static Future<Map<String, dynamic>> deleteAssignedActivity(String assignmentId) async {
+    final headers = await _authHeaders();
+
+    final res = await http.delete(
+      Uri.parse("$baseUrl/api/parent/assigned-activities/$assignmentId"),
+      headers: headers,
+    );
+
+    final data = _safeJson(res.body);
+    if (res.statusCode != 200) {
+      throw (data["message"] ?? "Failed to delete activity").toString();
+    }
+
+    return data;
+  }
+
+  static Future<Map<String, dynamic>> completeTeacherAssignedActivity(
+      String assignmentId,
+      ) async {
+    final headers = await _authHeaders();
+
+    final res = await http.put(
+      Uri.parse("$baseUrl/api/teacher/activities/$assignmentId/complete"),
+      headers: {
+        ...headers,
+        "Content-Type": "application/json",
+      },
+    );
+
+    final data = _safeJson(res.body);
+    if (res.statusCode != 200) {
+      throw (data["message"] ?? "Failed to complete assignment").toString();
+    }
+
+    return data;
+  }
+
+  static Future<Map<String, dynamic>> deleteTeacherAssignedActivity(
+      String assignmentId,
+      ) async {
+    final headers = await _authHeaders();
+
+    final res = await http.delete(
+      Uri.parse("$baseUrl/api/teacher/activities/$assignmentId"),
+      headers: headers,
+    );
+
+    final data = _safeJson(res.body);
+    if (res.statusCode != 200) {
+      throw (data["message"] ?? "Failed to delete assignment").toString();
+    }
+
+    return data;
+  }
 }
