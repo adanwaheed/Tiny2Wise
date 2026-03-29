@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import '../services/api_service.dart';
 import 'teacher_meetings_screen.dart';
-import 'student_enolled_screen.dart';
+import 'student_enrolled_screen.dart';
 import 'teacher_setting_screen.dart';
 import 'student_activity_screen.dart';
 

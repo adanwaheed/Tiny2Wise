@@ -5,6 +5,7 @@ import 'package:image_picker/image_picker.dart';
 
 import '../services/api_service.dart';
 import '../startup_screens/login_screen.dart';
+import '../news/urdu_news_screen.dart';
 
 class TeacherSettingScreen extends StatefulWidget {
   const TeacherSettingScreen({super.key});
@@ -377,7 +378,14 @@ class _TeacherSettingScreenState extends State<TeacherSettingScreen> {
                       icon: Icons.library_books_rounded,
                       title: "Open News Summarization",
                       subtitle: "Detailed",
-                      onTap: () => _toast("Coming soon"),
+                      onTap: () {
+                        Navigator.push(
+                          context,
+                          MaterialPageRoute(
+                            builder: (_) => const UrduNewsScreen(),
+                          ),
+                        );
+                      },
                     ),
                     const Divider(height: 1, color: border),
                     _arrowRow(

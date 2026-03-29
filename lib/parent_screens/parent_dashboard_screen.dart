@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:image_picker/image_picker.dart';
 
+import '../news/urdu_news_screen.dart';
 import '../services/api_service.dart';
 import 'parent_setting_screen.dart';
 import 'story_telling_screen.dart';
@@ -768,7 +769,12 @@ class _ParentDashboardScreenState extends State<ParentDashboardScreen>
                             borderColor: border,
                             onTap: () {
                               HapticFeedback.selectionClick();
-                              _toast("News");
+                              Navigator.push(
+                                context,
+                                MaterialPageRoute(
+                                  builder: (_) => const UrduNewsScreen(),
+                                ),
+                              );
                             },
                           ),
                         ),
