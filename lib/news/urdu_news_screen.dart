@@ -4,6 +4,7 @@ import 'package:google_fonts/google_fonts.dart';
 import '../models/news_article.dart';
 import '../services/api_service.dart';
 import 'news_summary_screen.dart';
+import 'saved_news.dart';
 
 class UrduNewsScreen extends StatefulWidget {
   const UrduNewsScreen({super.key});
@@ -20,6 +21,12 @@ class _UrduNewsScreenState extends State<UrduNewsScreen> {
   static const Color cardBorder = Color(0xFFDDE3D8);
 
   final List<int> _tabs = const [7, 14, 30];
+  final List<Map<String, String>> _topics = const [
+    {'key': '', 'label': 'All News', 'urdu': 'تمام خبریں'},
+    {'key': 'education', 'label': 'Education', 'urdu': 'تعلیم'},
+    {'key': 'sports', 'label': 'Sports', 'urdu': 'کھیل'},
+    {'key': 'politics', 'label': 'Politics', 'urdu': 'سیاست'},
+  ];
 
   final List<NewsArticle> _articles = [];
   int _selectedDays = 7;
@@ -29,6 +36,7 @@ class _UrduNewsScreenState extends State<UrduNewsScreen> {
   bool _refreshing = false;
   bool _hasMore = true;
   String _query = '';
+  String _selectedTopic = '';
 
   @override
   void initState() {
@@ -41,9 +49,9 @@ class _UrduNewsScreenState extends State<UrduNewsScreen> {
       'Noto Nastaliq Urdu',
       textStyle: const TextStyle(
         color: dark,
-        fontSize: 22,
+        fontSize: 21,
         fontWeight: FontWeight.w700,
-        height: 1.9,
+        height: 1.85,
       ),
     );
   }
@@ -53,11 +61,17 @@ class _UrduNewsScreenState extends State<UrduNewsScreen> {
       'Noto Nastaliq Urdu',
       textStyle: const TextStyle(
         color: textGrey,
-        fontSize: 15,
+        fontSize: 14,
         fontWeight: FontWeight.w600,
-        height: 1.9,
+        height: 1.85,
       ),
     );
+  }
+
+  String get _selectedTopicLabel {
+    final match = _topics.where((e) => e['key'] == _selectedTopic).toList();
+    if (match.isEmpty) return '';
+    return match.first['label'] ?? '';
   }
 
   Future<void> _loadNews({required bool reset}) async {
@@ -78,6 +92,7 @@ class _UrduNewsScreenState extends State<UrduNewsScreen> {
         page: reset ? 1 : _page,
         limit: 8,
         query: _query,
+        topic: _selectedTopic,
       );
 
       final fetched = (data['articles'] as List<dynamic>? ?? [])
@@ -137,40 +152,71 @@ class _UrduNewsScreenState extends State<UrduNewsScreen> {
     }
   }
 
-  Future<void> _openSearchDialog() async {
-    final controller = TextEditingController(text: _query);
-    final result = await showDialog<String>(
+  Future<void> _openTopicSheet() async {
+    final result = await showModalBottomSheet<String>(
       context: context,
+      backgroundColor: Colors.white,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(22)),
+      ),
       builder: (context) {
-        return AlertDialog(
-          title: const Text('Search News'),
-          content: TextField(
-            controller: controller,
-            autofocus: true,
-            decoration: const InputDecoration(
-              hintText: 'Type source, title or category',
+        return SafeArea(
+          child: Padding(
+            padding: const EdgeInsets.fromLTRB(16, 16, 16, 24),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                const Text(
+                  'Choose News Category',
+                  style: TextStyle(fontSize: 18, fontWeight: FontWeight.w700),
+                ),
+                const SizedBox(height: 6),
+                const Text(
+                  'Tap one category to filter the latest summarized news.',
+                  style: TextStyle(color: textGrey, fontSize: 13),
+                ),
+                const SizedBox(height: 16),
+                for (final item in _topics)
+                  ListTile(
+                    contentPadding: EdgeInsets.zero,
+                    leading: CircleAvatar(
+                      backgroundColor: item['key'] == _selectedTopic
+                          ? green.withOpacity(0.16)
+                          : const Color(0xFFF1F4EF),
+                      child: Icon(
+                        item['key'] == 'education'
+                            ? Icons.school_rounded
+                            : item['key'] == 'sports'
+                            ? Icons.sports_cricket_rounded
+                            : item['key'] == 'politics'
+                            ? Icons.account_balance_rounded
+                            : Icons.newspaper_rounded,
+                        color: item['key'] == _selectedTopic ? green : dark,
+                      ),
+                    ),
+                    title: Text(
+                      item['label'] ?? '',
+                      style: const TextStyle(fontWeight: FontWeight.w700),
+                    ),
+                    subtitle: Text(item['urdu'] ?? ''),
+                    trailing: item['key'] == _selectedTopic
+                        ? const Icon(Icons.check_circle_rounded, color: green)
+                        : null,
+                    onTap: () => Navigator.pop(context, item['key']),
+                  ),
+              ],
             ),
           ),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.pop(context),
-              child: const Text('Cancel'),
-            ),
-            TextButton(
-              onPressed: () => Navigator.pop(context, ''),
-              child: const Text('Clear'),
-            ),
-            ElevatedButton(
-              onPressed: () => Navigator.pop(context, controller.text.trim()),
-              child: const Text('Search'),
-            ),
-          ],
         );
       },
     );
 
     if (result == null) return;
-    setState(() => _query = result);
+    setState(() {
+      _selectedTopic = result;
+      _query = '';
+    });
     await _loadNews(reset: true);
   }
 
@@ -180,13 +226,14 @@ class _UrduNewsScreenState extends State<UrduNewsScreen> {
     if (diff.inMinutes < 1) return 'just now';
     if (diff.inMinutes < 60) return '${diff.inMinutes} min ago';
     if (diff.inHours < 24) return '${diff.inHours} hours ago';
-    return '${diff.inDays} day ago';
+    return '${diff.inDays} days ago';
   }
 
   Color _badgeColor(String category) {
     final c = category.toLowerCase();
     if (c.contains('education') || c.contains('تعلیم')) return const Color(0xFF3B82F6);
-    if (c.contains('national') || c.contains('قومی')) return const Color(0xFFEF4444);
+    if (c.contains('national') || c.contains('قومی') || c.contains('politic')) return const Color(0xFFEF4444);
+    if (c.contains('sports') || c.contains('کھیل')) return const Color(0xFFF59E0B);
     if (c.contains('weather') || c.contains('موسم')) return const Color(0xFF06B6D4);
     if (c.contains('technology') || c.contains('ٹیک')) return const Color(0xFFA855F7);
     return const Color(0xFF64748B);
@@ -354,10 +401,103 @@ class _UrduNewsScreenState extends State<UrduNewsScreen> {
     );
   }
 
+
+  void _onBottomTap(int index) {
+    if (index == 0) {
+      if (mounted) {
+        Navigator.pushReplacement(
+          context,
+          MaterialPageRoute(builder: (_) => const UrduNewsScreen()),
+        );
+      }
+      return;
+    }
+
+    if (index == 1) {
+      if (mounted) {
+        Navigator.pushReplacement(
+          context,
+          MaterialPageRoute(builder: (_) => const SavedNewsScreen()),
+        );
+      }
+    }
+  }
+
+  Widget _bottomNavItem({
+    required IconData icon,
+    required String label,
+    required bool selected,
+    required VoidCallback onTap,
+  }) {
+    return Expanded(
+      child: InkWell(
+        borderRadius: BorderRadius.circular(16),
+        onTap: onTap,
+        child: Padding(
+          padding: const EdgeInsets.symmetric(vertical: 10),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Icon(icon, color: selected ? green : textGrey),
+              const SizedBox(height: 4),
+              Text(
+                label,
+                style: TextStyle(
+                  fontSize: 12,
+                  fontWeight: selected ? FontWeight.w700 : FontWeight.w500,
+                  color: selected ? green : textGrey,
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildBottomNav() {
+    return SafeArea(
+      top: false,
+      child: Container(
+        margin: const EdgeInsets.fromLTRB(14, 0, 14, 12),
+        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+        decoration: BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.circular(22),
+          border: Border.all(color: cardBorder),
+          boxShadow: [
+            BoxShadow(
+              color: Colors.black.withOpacity(0.05),
+              blurRadius: 16,
+              offset: const Offset(0, 6),
+            ),
+          ],
+        ),
+        child: Row(
+          children: [
+            _bottomNavItem(
+              icon: Icons.newspaper_rounded,
+              label: 'News',
+              selected: true,
+              onTap: () {},
+            ),
+            _bottomNavItem(
+              icon: Icons.bookmark_rounded,
+              label: 'Saved',
+              selected: false,
+              onTap: () => _onBottomTap(1),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: bg,
+      bottomNavigationBar: _buildBottomNav(),
       body: SafeArea(
         child: RefreshIndicator(
           color: green,
@@ -382,7 +522,7 @@ class _UrduNewsScreenState extends State<UrduNewsScreen> {
                     ),
                   ),
                   IconButton(
-                    onPressed: _openSearchDialog,
+                    onPressed: _openTopicSheet,
                     icon: const Icon(Icons.search_rounded),
                   ),
                 ],
@@ -399,7 +539,7 @@ class _UrduNewsScreenState extends State<UrduNewsScreen> {
                   ],
                 ),
               ),
-              if (_query.isNotEmpty) ...[
+              if (_selectedTopic.isNotEmpty) ...[
                 const SizedBox(height: 14),
                 Row(
                   children: [
@@ -411,14 +551,14 @@ class _UrduNewsScreenState extends State<UrduNewsScreen> {
                         border: Border.all(color: cardBorder),
                       ),
                       child: Text(
-                        'Search: $_query',
+                        'Category: $_selectedTopicLabel',
                         style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w600),
                       ),
                     ),
                     const SizedBox(width: 8),
                     TextButton(
                       onPressed: () async {
-                        setState(() => _query = '');
+                        setState(() => _selectedTopic = '');
                         await _loadNews(reset: true);
                       },
                       child: const Text('Clear'),
@@ -440,16 +580,19 @@ class _UrduNewsScreenState extends State<UrduNewsScreen> {
                     borderRadius: BorderRadius.circular(18),
                     border: Border.all(color: cardBorder),
                   ),
-                  child: const Column(
+                  child: Column(
                     children: [
-                      Icon(Icons.newspaper_rounded, size: 42, color: textGrey),
-                      SizedBox(height: 12),
+                      const Icon(Icons.newspaper_rounded, size: 42, color: textGrey),
+                      const SizedBox(height: 12),
                       Text(
-                        'No news found right now.',
-                        style: TextStyle(fontWeight: FontWeight.w700, fontSize: 16),
+                        _selectedTopic.isEmpty
+                            ? 'No news found right now.'
+                            : 'No $_selectedTopicLabel news found for the selected days.',
+                        style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 16),
+                        textAlign: TextAlign.center,
                       ),
-                      SizedBox(height: 8),
-                      Text(
+                      const SizedBox(height: 8),
+                      const Text(
                         'Pull down to refresh or try another day filter.',
                         textAlign: TextAlign.center,
                         style: TextStyle(color: textGrey),

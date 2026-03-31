@@ -923,6 +923,7 @@ class ApiService {
     int page = 1,
     int limit = 10,
     String query = '',
+    String topic = '',
     bool savedOnly = false,
   }) async {
     final headers = await _authHeaders();
@@ -934,6 +935,7 @@ class ApiService {
           'page': page.toString(),
           'limit': limit.toString(),
           if (query.trim().isNotEmpty) 'query': query.trim(),
+          if (topic.trim().isNotEmpty) 'topic': topic.trim(),
           if (savedOnly) 'savedOnly': '1',
         },
       );
@@ -951,8 +953,8 @@ class ApiService {
 
     var data = await fetchOnce();
     final firstPage = page == 1;
-    final shouldRetry =
-        firstPage && query.trim().isEmpty && !savedOnly && ((data['articles'] as List?)?.isEmpty ?? true);
+    final shouldRetry = firstPage && query.trim().isEmpty && topic.trim().isEmpty && !savedOnly &&
+        ((data['articles'] as List?)?.isEmpty ?? true);
 
     if (!shouldRetry) {
       return data;

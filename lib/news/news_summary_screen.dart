@@ -6,6 +6,8 @@ import 'package:share_plus/share_plus.dart';
 
 import '../models/news_article.dart';
 import '../services/api_service.dart';
+import 'saved_news.dart';
+import 'urdu_news_screen.dart';
 
 class NewsSummaryScreen extends StatefulWidget {
   final NewsArticle initialArticle;
@@ -189,42 +191,35 @@ class _NewsSummaryScreenState extends State<NewsSummaryScreen> {
       final hasReadySummary =
           detailedArticle.summaryUrdu.trim().isNotEmpty && detailedArticle.bulletPointsUrdu.isNotEmpty;
 
-      if (hasReadySummary) {
-        if (!mounted) return;
-        setState(() {
-          _article = detailedArticle;
-          _estimatedTotalSeconds = _estimateSeconds(_buildTtsText(detailedArticle));
-        });
-        return;
-      }
+      if (!hasReadySummary) {
+        try {
+          final summary = await _trySummary(_identifiersFor(detailedArticle));
+          detailedArticle = detailedArticle.copyWith(
+            summaryUrdu: summary['summaryUrdu']?.toString().trim().isNotEmpty == true
+                ? summary['summaryUrdu']?.toString()
+                : detailedArticle.summaryUrdu,
+            bulletPointsUrdu: (summary['bulletPointsUrdu'] as List<dynamic>? ?? [])
+                .map((e) => e.toString().trim())
+                .where((e) => e.isNotEmpty)
+                .toList(),
+            saved: summary['saved'] == true ? true : detailedArticle.saved,
+          );
+        } catch (_) {
+          final fallbackSummary = detailedArticle.summaryUrdu.trim().isNotEmpty
+              ? detailedArticle.summaryUrdu.trim()
+              : detailedArticle.shortExcerpt.trim().isNotEmpty
+              ? detailedArticle.shortExcerpt.trim()
+              : detailedArticle.title.trim();
 
-      try {
-        final summary = await _trySummary(_identifiersFor(detailedArticle));
-        detailedArticle = detailedArticle.copyWith(
-          summaryUrdu: summary['summaryUrdu']?.toString().trim().isNotEmpty == true
-              ? summary['summaryUrdu']?.toString()
-              : detailedArticle.summaryUrdu,
-          bulletPointsUrdu: (summary['bulletPointsUrdu'] as List<dynamic>? ?? [])
-              .map((e) => e.toString().trim())
-              .where((e) => e.isNotEmpty)
-              .toList(),
-          saved: summary['saved'] == true ? true : detailedArticle.saved,
-        );
-      } catch (_) {
-        final fallbackSummary = detailedArticle.summaryUrdu.trim().isNotEmpty
-            ? detailedArticle.summaryUrdu.trim()
-            : detailedArticle.shortExcerpt.trim().isNotEmpty
-            ? detailedArticle.shortExcerpt.trim()
-            : detailedArticle.title.trim();
+          final fallbackPoints = detailedArticle.bulletPointsUrdu.isNotEmpty
+              ? detailedArticle.bulletPointsUrdu
+              : [fallbackSummary];
 
-        final fallbackPoints = detailedArticle.bulletPointsUrdu.isNotEmpty
-            ? detailedArticle.bulletPointsUrdu
-            : [fallbackSummary];
-
-        detailedArticle = detailedArticle.copyWith(
-          summaryUrdu: fallbackSummary,
-          bulletPointsUrdu: fallbackPoints,
-        );
+          detailedArticle = detailedArticle.copyWith(
+            summaryUrdu: fallbackSummary,
+            bulletPointsUrdu: fallbackPoints,
+          );
+        }
       }
 
       if (!mounted) return;
@@ -276,7 +271,7 @@ class _NewsSummaryScreenState extends State<NewsSummaryScreen> {
     if (diff.inMinutes < 1) return 'just now';
     if (diff.inMinutes < 60) return '${diff.inMinutes} min ago';
     if (diff.inHours < 24) return '${diff.inHours} hours ago';
-    return '${diff.inDays} day ago';
+    return '${diff.inDays} days ago';
   }
 
   Future<void> _toggleTts() async {
@@ -364,6 +359,98 @@ class _NewsSummaryScreenState extends State<NewsSummaryScreen> {
     await Share.share(text, subject: article.title);
   }
 
+
+  void _onBottomTap(int index) {
+    if (index == 0) {
+      if (mounted) {
+        Navigator.pushReplacement(
+          context,
+          MaterialPageRoute(builder: (_) => const UrduNewsScreen()),
+        );
+      }
+      return;
+    }
+
+    if (index == 1) {
+      if (mounted) {
+        Navigator.pushReplacement(
+          context,
+          MaterialPageRoute(builder: (_) => const SavedNewsScreen()),
+        );
+      }
+    }
+  }
+
+  Widget _bottomNavItem({
+    required IconData icon,
+    required String label,
+    required bool selected,
+    required VoidCallback onTap,
+  }) {
+    return Expanded(
+      child: InkWell(
+        borderRadius: BorderRadius.circular(16),
+        onTap: onTap,
+        child: Padding(
+          padding: const EdgeInsets.symmetric(vertical: 10),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Icon(icon, color: selected ? green : grey),
+              const SizedBox(height: 4),
+              Text(
+                label,
+                style: TextStyle(
+                  fontSize: 12,
+                  fontWeight: selected ? FontWeight.w700 : FontWeight.w500,
+                  color: selected ? green : grey,
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildBottomNav() {
+    return SafeArea(
+      top: false,
+      child: Container(
+        margin: const EdgeInsets.fromLTRB(14, 0, 14, 12),
+        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+        decoration: BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.circular(22),
+          border: Border.all(color: border),
+          boxShadow: [
+            BoxShadow(
+              color: Colors.black.withOpacity(0.05),
+              blurRadius: 16,
+              offset: const Offset(0, 6),
+            ),
+          ],
+        ),
+        child: Row(
+          children: [
+            _bottomNavItem(
+              icon: Icons.newspaper_rounded,
+              label: 'News',
+              selected: true,
+              onTap: () {},
+            ),
+            _bottomNavItem(
+              icon: Icons.bookmark_rounded,
+              label: 'Saved',
+              selected: false,
+              onTap: () => _onBottomTap(1),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
   @override
   void dispose() {
     _tts.stop();
@@ -376,6 +463,7 @@ class _NewsSummaryScreenState extends State<NewsSummaryScreen> {
 
     return Scaffold(
       backgroundColor: bg,
+      bottomNavigationBar: _buildBottomNav(),
       body: SafeArea(
         child: _loading && article == null
             ? const Center(child: CircularProgressIndicator(color: green))
@@ -414,7 +502,7 @@ class _NewsSummaryScreenState extends State<NewsSummaryScreen> {
                 child: Text(
                   article.title,
                   textAlign: TextAlign.center,
-                  style: _urduTitleStyle(size: 30, weight: FontWeight.w700),
+                  style: _urduTitleStyle(size: 25, weight: FontWeight.w700),
                 ),
               ),
             ),
@@ -581,8 +669,8 @@ class _NewsSummaryScreenState extends State<NewsSummaryScreen> {
               child: Column(
                 children: [
                   Row(
-                    children: [
-                      const Expanded(
+                    children: const [
+                      Expanded(
                         child: Text(
                           'KEY POINTS',
                           style: TextStyle(
@@ -597,11 +685,10 @@ class _NewsSummaryScreenState extends State<NewsSummaryScreen> {
                         textDirection: TextDirection.rtl,
                         child: Text(
                           'اہم نکات',
-                          style: _urduBodyStyle(
-                            size: 18,
-                            weight: FontWeight.w700,
+                          style: TextStyle(
                             color: green,
-                            height: 1.7,
+                            fontSize: 15,
+                            fontWeight: FontWeight.w800,
                           ),
                         ),
                       ),
@@ -613,7 +700,7 @@ class _NewsSummaryScreenState extends State<NewsSummaryScreen> {
                       textDirection: TextDirection.rtl,
                       child: Text(
                         'خلاصہ تیار کیا جا رہا ہے۔',
-                        style: _urduBodyStyle(size: 18, weight: FontWeight.w600),
+                        style: _urduBodyStyle(size: 16, weight: FontWeight.w600),
                       ),
                     )
                   else
@@ -622,7 +709,7 @@ class _NewsSummaryScreenState extends State<NewsSummaryScreen> {
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
                           const Padding(
-                            padding: EdgeInsets.only(top: 9),
+                            padding: EdgeInsets.only(top: 7),
                             child: Icon(Icons.circle, size: 7, color: green),
                           ),
                           const SizedBox(width: 8),
@@ -631,13 +718,13 @@ class _NewsSummaryScreenState extends State<NewsSummaryScreen> {
                               textDirection: TextDirection.rtl,
                               child: Text(
                                 point,
-                                style: _urduBodyStyle(size: 18, weight: FontWeight.w600),
+                                style: _urduBodyStyle(size: 16, weight: FontWeight.w600),
                               ),
                             ),
                           ),
                         ],
                       ),
-                      const SizedBox(height: 12),
+                      const SizedBox(height: 10),
                     ],
                 ],
               ),
@@ -669,11 +756,7 @@ class _NewsSummaryScreenState extends State<NewsSummaryScreen> {
                           ? 'خلاصہ تیار کیا جا رہا ہے۔'
                           : article.summaryUrdu,
                       textAlign: TextAlign.center,
-                      style: _urduBodyStyle(
-                        size: 24,
-                        weight: FontWeight.w700,
-                        height: 2.05,
-                      ),
+                      style: _urduBodyStyle(size: 20, weight: FontWeight.w600, height: 2.1),
                     ),
                   ),
                 ],
