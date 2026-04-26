@@ -1,3 +1,5 @@
+// flutter run --dart-define=API_BASE_URL=http://192.168.1.38:3000
+
 import 'dart:convert';
 import 'dart:io';
 import 'dart:typed_data';
@@ -295,6 +297,143 @@ class ApiService {
     }
 
     return data;
+  }
+
+  // -------------------- TODDLER 3D AVATAR / GEMINI CHAT --------------------
+
+  /// Sends the toddler's real spoken/typed question to the backend.
+  ///
+  /// Backend route:
+  /// POST /api/toddler/avatar-chat
+  ///
+  /// languageMode:
+  /// - 'auto'    => backend detects English/Urdu from message
+  /// - 'english' => force simple English reply
+  /// - 'urdu'    => force simple Urdu reply
+  static Future<String> sendToddlerMessage({
+    required String message,
+    String languageMode = 'auto',
+    String? toddlerId,
+  }) async {
+    final cleanMessage = message.trim();
+
+    if (cleanMessage.isEmpty) {
+      throw 'Message is empty';
+    }
+
+    final token = await getToken();
+
+    final response = await http
+        .post(
+      Uri.parse('$baseUrl/api/toddler/avatar-chat'),
+      headers: {
+        'Content-Type': 'application/json',
+        if (token != null && token.isNotEmpty) 'Authorization': 'Bearer $token',
+      },
+      body: jsonEncode({
+        'message': cleanMessage,
+        'languageMode': languageMode,
+        if (toddlerId != null && toddlerId.trim().isNotEmpty)
+          'toddlerId': toddlerId.trim(),
+      }),
+    )
+        .timeout(const Duration(seconds: 75));
+
+    final data = _safeJson(response.body);
+
+    if (response.statusCode < 200 || response.statusCode >= 300) {
+      final msg = data['message']?.toString() ?? 'Avatar reply failed';
+      final err = data['error']?.toString();
+
+      if (err != null && err.isNotEmpty) {
+        throw '$msg: $err';
+      }
+
+      throw msg;
+    }
+
+    final reply = data['reply']?.toString().trim() ?? '';
+
+    if (reply.isEmpty) {
+      throw 'Gemini returned empty reply';
+    }
+
+    return reply;
+  }
+
+  /// Same as sendToddlerMessage but kept for old screen code compatibility.
+  /// This does NOT hide backend/Gemini errors. If Gemini fails, it throws the real error.
+  static Future<String> sendToddlerAvatarMessage({
+    required String message,
+    String languageMode = 'auto',
+    String? toddlerId,
+  }) async {
+    return sendToddlerMessage(
+      message: message,
+      languageMode: languageMode,
+      toddlerId: toddlerId,
+    );
+  }
+
+  /// Returns full backend JSON response:
+  /// { reply, modelUsed, inputLanguage }
+  static Future<Map<String, dynamic>> sendToddlerAvatarMessageRaw({
+    required String message,
+    String languageMode = 'auto',
+    String? toddlerId,
+  }) async {
+    final cleanMessage = message.trim();
+
+    if (cleanMessage.isEmpty) {
+      throw 'Message is empty';
+    }
+
+    final token = await getToken();
+
+    final response = await http
+        .post(
+      Uri.parse('$baseUrl/api/toddler/avatar-chat'),
+      headers: {
+        'Content-Type': 'application/json',
+        if (token != null && token.isNotEmpty) 'Authorization': 'Bearer $token',
+      },
+      body: jsonEncode({
+        'message': cleanMessage,
+        'languageMode': languageMode,
+        if (toddlerId != null && toddlerId.trim().isNotEmpty)
+          'toddlerId': toddlerId.trim(),
+      }),
+    )
+        .timeout(const Duration(seconds: 75));
+
+    final data = _safeJson(response.body);
+
+    if (response.statusCode < 200 || response.statusCode >= 300) {
+      final msg = data['message']?.toString() ?? 'Avatar reply failed';
+      final err = data['error']?.toString();
+
+      if (err != null && err.isNotEmpty) {
+        throw '$msg: $err';
+      }
+
+      throw msg;
+    }
+
+    return data;
+  }
+
+  /// Useful for typed testing:
+  /// final reply = await ApiService.askToddlerAvatarQuestion('What color is an apple?');
+  static Future<String> askToddlerAvatarQuestion(
+      String question, {
+        String languageMode = 'auto',
+        String? toddlerId,
+      }) async {
+    return sendToddlerMessage(
+      message: question,
+      languageMode: languageMode,
+      toddlerId: toddlerId,
+    );
   }
 
   // -------------------- STORY STUDIO --------------------

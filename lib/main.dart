@@ -21,3 +21,23 @@ class MyApp extends StatelessWidget {
     );
   }
 }
+
+//
+// import 'package:flutter/material.dart';
+// import 'toddler_screens/toddler_avatar_screen.dart';
+//
+// void main() {
+//   runApp(const Tiny2WiseTestApp());
+// }
+//
+// class Tiny2WiseTestApp extends StatelessWidget {
+//   const Tiny2WiseTestApp({super.key});
+//
+//   @override
+//   Widget build(BuildContext context) {
+//     return const MaterialApp(
+//       debugShowCheckedModeBanner: false,
+//       home: ToddlerAvatarScreen(),
+//     );
+//   }
+// }
