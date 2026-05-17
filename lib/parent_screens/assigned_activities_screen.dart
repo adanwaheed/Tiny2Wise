@@ -228,65 +228,43 @@ class _AssignedActivitiesScreenState extends State<AssignedActivitiesScreen> {
   }) {
     return Expanded(
       child: SizedBox(
-        height: 42,
+        height: 40,
         child: filled
-            ? ElevatedButton(
+            ? ElevatedButton.icon(
           style: ElevatedButton.styleFrom(
             backgroundColor: color,
             elevation: 0,
-            padding: const EdgeInsets.symmetric(horizontal: 8),
             shape: RoundedRectangleBorder(
               borderRadius: BorderRadius.circular(12),
             ),
           ),
           onPressed: onTap,
-          child: Row(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              Icon(icon, size: 16, color: Colors.white),
-              const SizedBox(width: 6),
-              Flexible(
-                child: Text(
-                  label,
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                  style: const TextStyle(
-                    color: Colors.white,
-                    fontWeight: FontWeight.w900,
-                    fontSize: 12,
-                  ),
-                ),
-              ),
-            ],
+          icon: Icon(icon, size: 16, color: Colors.white),
+          label: Text(
+            label,
+            style: const TextStyle(
+              color: Colors.white,
+              fontWeight: FontWeight.w900,
+              fontSize: 12.5,
+            ),
           ),
         )
-            : OutlinedButton(
+            : OutlinedButton.icon(
           style: OutlinedButton.styleFrom(
-            padding: const EdgeInsets.symmetric(horizontal: 8),
             side: BorderSide(color: color.withOpacity(0.35)),
             shape: RoundedRectangleBorder(
               borderRadius: BorderRadius.circular(12),
             ),
           ),
           onPressed: onTap,
-          child: Row(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              Icon(icon, size: 16, color: color),
-              const SizedBox(width: 6),
-              Flexible(
-                child: Text(
-                  label,
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                  style: TextStyle(
-                    color: color,
-                    fontWeight: FontWeight.w900,
-                    fontSize: 12,
-                  ),
-                ),
-              ),
-            ],
+          icon: Icon(icon, size: 16, color: color),
+          label: Text(
+            label,
+            style: TextStyle(
+              color: color,
+              fontWeight: FontWeight.w900,
+              fontSize: 12.5,
+            ),
           ),
         ),
       ),
@@ -315,7 +293,6 @@ class _AssignedActivitiesScreenState extends State<AssignedActivitiesScreen> {
         color: green,
         onRefresh: _loadAssignments,
         child: ListView(
-          physics: const AlwaysScrollableScrollPhysics(),
           padding: const EdgeInsets.fromLTRB(16, 6, 16, 16),
           children: [
             Container(
@@ -384,6 +361,8 @@ class _AssignedActivitiesScreenState extends State<AssignedActivitiesScreen> {
                 final id = (item["_id"] ?? "").toString();
                 final type = (item["activityType"] ?? "").toString();
                 final teacherName = (item["teacherName"] ?? "Teacher").toString();
+                final customTitle = (item["title"] ?? "").toString();
+                final description = (item["description"] ?? "").toString();
                 final classTitle = (item["classTitle"] ?? "").toString();
                 final targetType = (item["targetType"] ?? "").toString();
                 final assignedAt = (item["assignedAt"] ?? "").toString();
@@ -417,7 +396,9 @@ class _AssignedActivitiesScreenState extends State<AssignedActivitiesScreen> {
                                 crossAxisAlignment: CrossAxisAlignment.start,
                                 children: [
                                   Text(
-                                    _activityTitle(type),
+                                    customTitle.trim().isNotEmpty ? customTitle : _activityTitle(type),
+                                    maxLines: 2,
+                                    overflow: TextOverflow.ellipsis,
                                     style: const TextStyle(
                                       color: dark,
                                       fontSize: 14,
@@ -433,6 +414,19 @@ class _AssignedActivitiesScreenState extends State<AssignedActivitiesScreen> {
                                       fontWeight: FontWeight.w700,
                                     ),
                                   ),
+                                  if (description.trim().isNotEmpty) ...[
+                                    const SizedBox(height: 4),
+                                    Text(
+                                      description,
+                                      maxLines: 2,
+                                      overflow: TextOverflow.ellipsis,
+                                      style: const TextStyle(
+                                        color: grey,
+                                        fontSize: 12,
+                                        fontWeight: FontWeight.w700,
+                                      ),
+                                    ),
+                                  ],
                                   if (classTitle.trim().isNotEmpty) ...[
                                     const SizedBox(height: 4),
                                     Text(

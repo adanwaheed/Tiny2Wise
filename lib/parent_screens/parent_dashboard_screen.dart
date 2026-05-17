@@ -6,10 +6,12 @@ import 'package:image_picker/image_picker.dart';
 
 import '../news/urdu_news_screen.dart';
 import '../toddler_screens/toddler_avatar_screen.dart';
+import '../toddler_screens/toddler_mocktest.dart';
 import '../services/api_service.dart';
 import 'parent_setting_screen.dart';
 import 'story_telling_screen.dart';
 import 'assigned_activities_screen.dart';
+import 'toddler_activity.dart';
 
 class ParentDashboardScreen extends StatefulWidget {
   final String parentName;
@@ -96,6 +98,49 @@ class _ParentDashboardScreenState extends State<ParentDashboardScreen>
       ),
     ).then((_) {
       if (activeToddlerId != null) {
+        _loadAssignedActivities(activeToddlerId!);
+      }
+    });
+  }
+
+
+  void _openToddlerActivity() {
+    if (activeToddlerId == null) {
+      _toast("Select a child first");
+      return;
+    }
+
+    Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (_) => ToddlerActivityScreen(
+          toddlerId: activeToddlerId!,
+          toddlerName: _activeName(),
+        ),
+      ),
+    ).then((_) {
+      if (activeToddlerId != null) {
+        _loadAssignedActivities(activeToddlerId!);
+      }
+    });
+  }
+
+  void _openMockTest() {
+    if (activeToddlerId == null) {
+      _toast("Select a child first");
+      return;
+    }
+
+    Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (_) => ToddlerMockTestScreen(
+          toddlerId: activeToddlerId!,
+          toddlerName: _activeName(),
+        ),
+      ),
+    ).then((changed) {
+      if (changed == true && activeToddlerId != null) {
         _loadAssignedActivities(activeToddlerId!);
       }
     });
@@ -256,7 +301,8 @@ class _ParentDashboardScreenState extends State<ParentDashboardScreen>
             Navigator.pop(context);
           },
           onActivityTap: () {
-            // add your activity screen navigation here
+            Navigator.pop(context);
+            _openToddlerActivity();
           },
           onBookmarkTap: () {
             // add your bookmark screen navigation here
@@ -302,7 +348,7 @@ class _ParentDashboardScreenState extends State<ParentDashboardScreen>
           onHomeTap: () => HapticFeedback.selectionClick(),
           onActivityTap: () {
             HapticFeedback.selectionClick();
-            _toast("Activity coming soon");
+            _openToddlerActivity();
           },
           onBookmarkTap: () {
             HapticFeedback.selectionClick();
@@ -671,7 +717,9 @@ class _ParentDashboardScreenState extends State<ParentDashboardScreen>
                                     crossAxisAlignment: CrossAxisAlignment.start,
                                     children: [
                                       Text(
-                                        _teacherActivityTitle((item["activityType"] ?? "").toString()),
+                                        (item["title"] ?? "").toString().trim().isNotEmpty
+                                            ? (item["title"] ?? "").toString()
+                                            : _teacherActivityTitle((item["activityType"] ?? "").toString()),
                                         style: const TextStyle(
                                           color: dark,
                                           fontSize: 13.5,
@@ -680,7 +728,11 @@ class _ParentDashboardScreenState extends State<ParentDashboardScreen>
                                       ),
                                       const SizedBox(height: 4),
                                       Text(
-                                        "By ${(item["teacherName"] ?? "Teacher").toString()}",
+                                        (item["description"] ?? "").toString().trim().isNotEmpty
+                                            ? "${(item["description"] ?? "").toString()} • By ${(item["teacherName"] ?? "Teacher").toString()}"
+                                            : "By ${(item["teacherName"] ?? "Teacher").toString()}",
+                                        maxLines: 2,
+                                        overflow: TextOverflow.ellipsis,
                                         style: const TextStyle(
                                           color: grey,
                                           fontSize: 11.8,
@@ -703,88 +755,92 @@ class _ParentDashboardScreenState extends State<ParentDashboardScreen>
                     ),
                     const SizedBox(height: 12),
 
-                    Row(
-                      children: [
-                        Expanded(
-                          child: _ActivityCard(
-                            icon: Icons.quiz_outlined,
-                            title: "Mockup Test",
-                            subtitle: "Child Quiz",
-                            bg: const Color(0xFFFFFFFF),
-                            iconBg: green,
-                            borderColor: border,
-                            onTap: () {
-                              HapticFeedback.selectionClick();
-                              _toast("Mockup Test");
-                            },
-                          ),
-                        ),
-                        const SizedBox(width: 12),
-                        Expanded(
-                          child: _ActivityCard(
-                            icon: Icons.videogame_asset_rounded,
-                            title: "Games",
-                            subtitle: "Play Time",
-                            bg: const Color(0xFFFFFFFF),
-                            iconBg: green,
-                            borderColor: border,
-                            onTap: () {
-                              HapticFeedback.selectionClick();
-
-                              Navigator.push(
-                                context,
-                                MaterialPageRoute(
-                                  builder: (context) => const ToddlerAvatarScreen(),
-                                ),
-                              );
-                            },
-                          ),
-                        ),
-                      ],
-                    ),
-                    const SizedBox(height: 12),
-                    Row(
-                      children: [
-                        Expanded(
-                          child: _ActivityCard(
-                            icon: Icons.mic_rounded,
-                            title: "Story Telling",
-                            subtitle: "Stories for Child",
-                            bg: const Color(0xFFFFFFFF),
-                            iconBg: green,
-                            borderColor: border,
-                            onTap: () {
-                              HapticFeedback.selectionClick();
-                              Navigator.push(
-                                context,
-                                MaterialPageRoute(
-                                  builder: (_) => const StoryTellingScreen(),
-                                ),
-                              );
-                            },
-                          ),
-                        ),
-                        const SizedBox(width: 12),
-                        Expanded(
-                          child: _ActivityCard(
-                            icon: Icons.article_rounded,
-                            title: "News",
-                            subtitle: "Read & Listen",
-                            bg: const Color(0xFFFFFFFF),
-                            iconBg: green,
-                            borderColor: border,
-                            onTap: () {
-                              HapticFeedback.selectionClick();
-                              Navigator.push(
-                                context,
-                                MaterialPageRoute(
-                                  builder: (_) => const UrduNewsScreen(),
-                                ),
-                              );
-                            },
-                          ),
-                        ),
-                      ],
+                    LayoutBuilder(
+                      builder: (context, constraints) {
+                        final gap = constraints.maxWidth < 360 ? 10.0 : 12.0;
+                        final itemWidth = (constraints.maxWidth - gap) / 2;
+                        return Wrap(
+                          spacing: gap,
+                          runSpacing: gap,
+                          children: [
+                            SizedBox(
+                              width: itemWidth,
+                              child: _ActivityCard(
+                                icon: Icons.quiz_outlined,
+                                title: "Mockup Test",
+                                subtitle: "Child Quiz",
+                                bg: const Color(0xFFFFFFFF),
+                                iconBg: green,
+                                borderColor: border,
+                                onTap: () {
+                                  HapticFeedback.selectionClick();
+                                  _openMockTest();
+                                },
+                              ),
+                            ),
+                            SizedBox(
+                              width: itemWidth,
+                              child: _ActivityCard(
+                                icon: Icons.videogame_asset_rounded,
+                                title: "Games",
+                                subtitle: "Play Time",
+                                bg: const Color(0xFFFFFFFF),
+                                iconBg: green,
+                                borderColor: border,
+                                onTap: () {
+                                  HapticFeedback.selectionClick();
+                                  Navigator.push(
+                                    context,
+                                    MaterialPageRoute(
+                                      builder: (context) => const ToddlerAvatarScreen(),
+                                    ),
+                                  );
+                                },
+                              ),
+                            ),
+                            SizedBox(
+                              width: itemWidth,
+                              child: _ActivityCard(
+                                icon: Icons.mic_rounded,
+                                title: "Story Telling",
+                                subtitle: "Stories for Child",
+                                bg: const Color(0xFFFFFFFF),
+                                iconBg: green,
+                                borderColor: border,
+                                onTap: () {
+                                  HapticFeedback.selectionClick();
+                                  Navigator.push(
+                                    context,
+                                    MaterialPageRoute(
+                                      builder: (_) => const StoryTellingScreen(),
+                                    ),
+                                  );
+                                },
+                              ),
+                            ),
+                            SizedBox(
+                              width: itemWidth,
+                              child: _ActivityCard(
+                                icon: Icons.article_rounded,
+                                title: "News",
+                                subtitle: "Read & Listen",
+                                bg: const Color(0xFFFFFFFF),
+                                iconBg: green,
+                                borderColor: border,
+                                onTap: () {
+                                  HapticFeedback.selectionClick();
+                                  Navigator.push(
+                                    context,
+                                    MaterialPageRoute(
+                                      builder: (_) => const UrduNewsScreen(),
+                                    ),
+                                  );
+                                },
+                              ),
+                            ),
+                          ],
+                        );
+                      },
                     ),
 
                     const SizedBox(height: 22),
@@ -1242,15 +1298,11 @@ class _ActivityCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final width = MediaQuery.sizeOf(context).width;
-    final compact = width < 370;
-    final iconSize = compact ? 42.0 : 48.0;
-
     return _PressableCard(
       onTap: onTap,
       child: Container(
-        constraints: const BoxConstraints(minHeight: 118),
-        padding: EdgeInsets.all(compact ? 10 : 12),
+        constraints: const BoxConstraints(minHeight: 116),
+        padding: const EdgeInsets.all(12),
         decoration: BoxDecoration(
           color: bg,
           borderRadius: BorderRadius.circular(20),
@@ -1266,8 +1318,8 @@ class _ActivityCard extends StatelessWidget {
         child: Row(
           children: [
             Container(
-              width: iconSize,
-              height: iconSize,
+              width: 48,
+              height: 48,
               decoration: BoxDecoration(
                 color: iconBg,
                 shape: BoxShape.circle,
@@ -1279,9 +1331,9 @@ class _ActivityCard extends StatelessWidget {
                   )
                 ],
               ),
-              child: Icon(icon, color: Colors.white, size: compact ? 18 : 20),
+              child: Icon(icon, color: Colors.white, size: 22),
             ),
-            SizedBox(width: compact ? 8 : 10),
+            const SizedBox(width: 10),
             Expanded(
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
@@ -1291,30 +1343,19 @@ class _ActivityCard extends StatelessWidget {
                     title,
                     maxLines: 2,
                     overflow: TextOverflow.ellipsis,
-                    style: TextStyle(
-                      color: dark,
-                      fontSize: compact ? 12.4 : 13.6,
-                      fontWeight: FontWeight.w900,
-                      height: 1.12,
-                    ),
+                    style: const TextStyle(color: dark, fontSize: 13.2, fontWeight: FontWeight.w900, height: 1.1),
                   ),
                   const SizedBox(height: 4),
                   Text(
                     subtitle,
                     maxLines: 2,
                     overflow: TextOverflow.ellipsis,
-                    style: TextStyle(
-                      color: grey,
-                      fontSize: compact ? 10.6 : 11.2,
-                      fontWeight: FontWeight.w800,
-                      height: 1.15,
-                    ),
+                    style: const TextStyle(color: grey, fontSize: 11.2, fontWeight: FontWeight.w800, height: 1.15),
                   ),
                 ],
               ),
             ),
-            if (!compact)
-              const Icon(Icons.chevron_right_rounded, color: Color(0xFF9FB1A8)),
+            const Icon(Icons.chevron_right_rounded, color: Color(0xFF9FB1A8)),
           ],
         ),
       ),

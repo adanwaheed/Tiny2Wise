@@ -6,6 +6,7 @@ import 'package:permission_handler/permission_handler.dart';
 import 'package:speech_to_text/speech_to_text.dart' as stt;
 
 import '../services/api_service.dart';
+import 'toddler_mocktest.dart';
 import '../widgets/avatar_webview_widget.dart';
 
 class ToddlerAvatarScreen extends StatefulWidget {
@@ -530,7 +531,14 @@ class _ToddlerAvatarScreenState extends State<ToddlerAvatarScreen> {
                             icon: Icons.description_rounded,
                             label: 'Mock Test',
                             color: const Color(0xFF3193FF),
-                            onTap: () {},
+                            onTap: () {
+                              Navigator.push(
+                                context,
+                                MaterialPageRoute(
+                                  builder: (_) => const ToddlerMockTestScreen(),
+                                ),
+                              );
+                            },
                           ),
                           const SizedBox(width: 34),
                           _TopActionButton(
@@ -544,10 +552,10 @@ class _ToddlerAvatarScreenState extends State<ToddlerAvatarScreen> {
                     ),
 
                     Positioned(
-                      top: 176,
+                      top: contentHeight < 680 ? 162 : 176,
                       left: 0,
                       right: 0,
-                      bottom: 105,
+                      bottom: contentHeight < 680 ? 92 : 105,
                       child: Column(
                         children: [
                           _SpeechBubble(
@@ -559,8 +567,8 @@ class _ToddlerAvatarScreenState extends State<ToddlerAvatarScreen> {
                           Expanded(
                             child: Center(
                               child: SizedBox(
-                                height: contentHeight < 760 ? 250 : 290,
-                                width: contentWidth < 340 ? contentWidth * 0.86 : 300,
+                                height: contentHeight < 680 ? 210 : (contentHeight < 760 ? 250 : 290),
+                                width: contentWidth < 340 ? contentWidth * 0.82 : 300,
                                 child: AvatarWebViewWidget(
                                   key: avatarKey,
                                   initialMessage: _bubbleText,
@@ -622,36 +630,27 @@ class _ToddlerAvatarScreenState extends State<ToddlerAvatarScreen> {
                       left: 0,
                       right: 0,
                       bottom: 16,
-                      child: SingleChildScrollView(
-                        scrollDirection: Axis.horizontal,
-                        child: Row(
-                          mainAxisAlignment: MainAxisAlignment.center,
-                          children: const [
-                            _BottomItem(
-                              icon: Icons.sports_esports_rounded,
-                              label: 'Games',
-                              color: Color(0xFF2865F0),
-                            ),
-                            SizedBox(width: 18),
-                            _BottomItem(
-                              icon: Icons.extension_rounded,
-                              label: 'Puzzles',
-                              color: Color(0xFF49D83F),
-                            ),
-                            SizedBox(width: 18),
-                            _BottomItem(
-                              icon: Icons.menu_book_rounded,
-                              label: 'Story Time',
-                              color: Color(0xFF8A6D20),
-                            ),
-                            SizedBox(width: 18),
-                            _BottomItem(
-                              icon: Icons.chat_bubble_outline_rounded,
-                              label: 'Chatbot',
-                              color: Color(0xFFFF5A2A),
-                            ),
-                          ],
-                        ),
+                      child: Row(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: const [
+                          _BottomItem(
+                            icon: Icons.sports_esports_rounded,
+                            label: 'Games',
+                            color: Color(0xFF2865F0),
+                          ),
+                          SizedBox(width: 24),
+                          _BottomItem(
+                            icon: Icons.extension_rounded,
+                            label: 'Puzzles',
+                            color: Color(0xFF49D83F),
+                          ),
+                          SizedBox(width: 24),
+                          _BottomItem(
+                            icon: Icons.menu_book_rounded,
+                            label: 'Story Time',
+                            color: Color(0xFF8A6D20),
+                          ),
+                        ],
                       ),
                     ),
                   ],
@@ -822,8 +821,8 @@ class _BottomItem extends StatelessWidget {
     return Column(
       children: [
         Container(
-          height: 58,
-          width: 58,
+          height: 56,
+          width: 56,
           decoration: BoxDecoration(
             color: color,
             borderRadius: BorderRadius.circular(16),
@@ -842,12 +841,18 @@ class _BottomItem extends StatelessWidget {
           ),
         ),
         const SizedBox(height: 6),
-        Text(
-          label,
-          style: TextStyle(
-            color: color,
-            fontSize: 13,
-            fontWeight: FontWeight.w900,
+        SizedBox(
+          width: 74,
+          child: Text(
+            label,
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+            textAlign: TextAlign.center,
+            style: TextStyle(
+              color: color,
+              fontSize: 12.5,
+              fontWeight: FontWeight.w900,
+            ),
           ),
         ),
       ],

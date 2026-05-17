@@ -942,6 +942,133 @@ class ApiService {
     return data;
   }
 
+
+  // -------------------- TODDLER MOCK TEST --------------------
+
+  static Future<Map<String, dynamic>> generateToddlerMockTest({
+    required String toddlerId,
+    int count = 5,
+  }) async {
+    final headers = await _authHeaders();
+
+    final res = await http
+        .post(
+      Uri.parse('$baseUrl/api/toddlers/$toddlerId/mock-test/generate'),
+      headers: {
+        ...headers,
+        'Content-Type': 'application/json',
+      },
+      body: jsonEncode({'count': count}),
+    )
+        .timeout(const Duration(seconds: 75));
+
+    final data = _safeJson(res.body);
+    if (res.statusCode != 200) {
+      throw (data['message'] ?? 'Failed to generate mock test').toString();
+    }
+    return data;
+  }
+
+  static Future<Map<String, dynamic>> submitToddlerMockTestResult({
+    required String toddlerId,
+    required List<Map<String, dynamic>> answers,
+    DateTime? startedAt,
+  }) async {
+    final headers = await _authHeaders();
+
+    final res = await http
+        .post(
+      Uri.parse('$baseUrl/api/toddlers/$toddlerId/mock-test/submit'),
+      headers: {
+        ...headers,
+        'Content-Type': 'application/json',
+      },
+      body: jsonEncode({
+        'answers': answers,
+        if (startedAt != null) 'startedAt': startedAt.toIso8601String(),
+      }),
+    )
+        .timeout(const Duration(seconds: 45));
+
+    final data = _safeJson(res.body);
+    if (res.statusCode != 200) {
+      throw (data['message'] ?? 'Failed to save mock test result').toString();
+    }
+    return data;
+  }
+
+  static Future<List<dynamic>> getToddlerMockTestResults({
+    required String toddlerId,
+    int limit = 20,
+  }) async {
+    final headers = await _authHeaders();
+
+    final uri = Uri.parse('$baseUrl/api/toddlers/$toddlerId/mock-test/results').replace(
+      queryParameters: {'limit': limit.toString()},
+    );
+
+    final res = await http
+        .get(uri, headers: headers)
+        .timeout(const Duration(seconds: 30));
+
+    final data = _safeJson(res.body);
+    if (res.statusCode != 200) {
+      throw (data['message'] ?? 'Failed to load mock test results').toString();
+    }
+
+    return (data['results'] as List<dynamic>? ?? []);
+  }
+
+  static Future<Map<String, dynamic>> sendMockTestReportToTeacher({
+    required String resultId,
+  }) async {
+    final headers = await _authHeaders();
+
+    final res = await http
+        .post(
+      Uri.parse('$baseUrl/api/mock-test-results/$resultId/send-to-teacher'),
+      headers: {
+        ...headers,
+        'Content-Type': 'application/json',
+      },
+    )
+        .timeout(const Duration(seconds: 25));
+
+    final data = _safeJson(res.body);
+    if (res.statusCode != 200) {
+      throw (data['message'] ?? 'Failed to send report to teacher').toString();
+    }
+    return data;
+  }
+
+  static Future<List<dynamic>> getTeacherMockTestResults({
+    int limit = 30,
+    bool? sentToTeacher,
+    String? createdByRole,
+  }) async {
+    final headers = await _authHeaders();
+
+    final uri = Uri.parse('$baseUrl/api/teacher/mock-test-results').replace(
+      queryParameters: {
+        'limit': limit.toString(),
+        if (sentToTeacher != null) 'sentToTeacher': sentToTeacher ? '1' : '0',
+        if (createdByRole != null && createdByRole.trim().isNotEmpty)
+          'createdByRole': createdByRole.trim(),
+      },
+    );
+
+    final res = await http
+        .get(uri, headers: headers)
+        .timeout(const Duration(seconds: 30));
+
+    final data = _safeJson(res.body);
+    if (res.statusCode != 200) {
+      throw (data['message'] ?? 'Failed to load teacher mock test reports').toString();
+    }
+
+    return (data['results'] as List<dynamic>? ?? []);
+  }
+
   static String _newsIdentifierPath(String articleIdentifier) {
     final value = articleIdentifier.trim();
     if (value.isEmpty) {

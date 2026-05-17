@@ -4,6 +4,7 @@ import 'teacher_meetings_screen.dart';
 import 'student_enrolled_screen.dart';
 import 'teacher_setting_screen.dart';
 import 'student_activity_screen.dart';
+import '../toddler_screens/toddler_mocktest.dart';
 
 class TeacherDashboardScreen extends StatefulWidget {
   final String teacherName;
@@ -39,6 +40,7 @@ class _TeacherDashboardScreenState extends State<TeacherDashboardScreen> {
   int progressPercent = 0;
 
   List<Map<String, dynamic>> classes = [];
+  List<Map<String, dynamic>> homeActivityReports = [];
   int upcomingCount = 0;
 
   @override
@@ -84,9 +86,17 @@ class _TeacherDashboardScreenState extends State<TeacherDashboardScreen> {
       tasksCount = (stats["tasks"] ?? 0) as int;
       progressPercent = (stats["progress"] ?? 0) as int;
 
-      classes = (data["classes"] as List<dynamic>? ?? []).cast<Map<String, dynamic>>();
+      classes = (data["classes"] as List<dynamic>? ?? [])
+          .map((e) => Map<String, dynamic>.from(e as Map))
+          .toList();
 
-      final upcoming = (data["upcoming"] as List<dynamic>? ?? []).cast<Map<String, dynamic>>();
+      homeActivityReports = (data["homeActivity"] as List<dynamic>? ?? [])
+          .map((e) => Map<String, dynamic>.from(e as Map))
+          .toList();
+
+      final upcoming = (data["upcoming"] as List<dynamic>? ?? [])
+          .map((e) => Map<String, dynamic>.from(e as Map))
+          .toList();
       upcomingCount = upcoming.length;
     } catch (e) {
       _toast("Failed to load: $e");
@@ -242,6 +252,176 @@ class _TeacherDashboardScreenState extends State<TeacherDashboardScreen> {
     if (changed == true) await _loadDashboard();
   }
 
+
+  List<Map<String, dynamic>> _linkedStudentsFromClasses() {
+    final seen = <String>{};
+    final students = <Map<String, dynamic>>[];
+
+    for (final c in classes) {
+      final classTitle = (c["title"] ?? "Class").toString();
+      final rawStudents = (c["students"] as List<dynamic>? ?? []);
+
+      for (final raw in rawStudents) {
+        final s = Map<String, dynamic>.from(raw as Map);
+        final id = (s["toddlerId"] ?? s["_id"] ?? s["id"] ?? "").toString();
+        if (id.isEmpty || seen.contains(id)) continue;
+        seen.add(id);
+        students.add({
+          "_id": id,
+          "name": (s["name"] ?? "Student").toString(),
+          "classTitle": classTitle,
+          "photoUrl": "/api/toddlers/$id/photo",
+        });
+      }
+    }
+
+    return students;
+  }
+
+  Future<Map<String, dynamic>?> _selectStudentForMockTest() async {
+    final students = _linkedStudentsFromClasses();
+
+    if (students.isEmpty) {
+      _toast("No students found. Add students to a class first.");
+      return null;
+    }
+
+    return showModalBottomSheet<Map<String, dynamic>>(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (_) {
+        return DraggableScrollableSheet(
+          initialChildSize: 0.68,
+          minChildSize: 0.35,
+          maxChildSize: 0.88,
+          builder: (context, controller) {
+            return Container(
+              decoration: const BoxDecoration(
+                color: Colors.white,
+                borderRadius: BorderRadius.vertical(top: Radius.circular(22)),
+              ),
+              child: Column(
+                children: [
+                  const SizedBox(height: 10),
+                  Container(
+                    width: 44,
+                    height: 4,
+                    decoration: BoxDecoration(
+                      color: const Color(0xFFE5E7EB),
+                      borderRadius: BorderRadius.circular(99),
+                    ),
+                  ),
+                  Padding(
+                    padding: const EdgeInsets.fromLTRB(16, 14, 8, 8),
+                    child: Row(
+                      children: [
+                        const Expanded(
+                          child: Text(
+                            "Select toddler for Mock Test",
+                            style: TextStyle(color: dark, fontSize: 16, fontWeight: FontWeight.w900),
+                          ),
+                        ),
+                        IconButton(
+                          onPressed: () => Navigator.pop(context),
+                          icon: const Icon(Icons.close_rounded),
+                        ),
+                      ],
+                    ),
+                  ),
+                  Expanded(
+                    child: ListView.separated(
+                      controller: controller,
+                      padding: const EdgeInsets.fromLTRB(16, 4, 16, 18),
+                      itemCount: students.length,
+                      separatorBuilder: (_, __) => const SizedBox(height: 10),
+                      itemBuilder: (_, index) {
+                        final student = students[index];
+                        final name = (student["name"] ?? "Student").toString();
+                        final classTitle = (student["classTitle"] ?? "Class").toString();
+
+                        return InkWell(
+                          onTap: () => Navigator.pop(context, student),
+                          borderRadius: BorderRadius.circular(16),
+                          child: Container(
+                            padding: const EdgeInsets.all(12),
+                            decoration: BoxDecoration(
+                              color: const Color(0xFFF9FAFB),
+                              borderRadius: BorderRadius.circular(16),
+                              border: Border.all(color: border),
+                            ),
+                            child: Row(
+                              children: [
+                                CircleAvatar(
+                                  radius: 20,
+                                  backgroundColor: const Color(0xFFE8FFF2),
+                                  child: Text(
+                                    name.trim().isNotEmpty ? name.trim()[0].toUpperCase() : "S",
+                                    style: const TextStyle(color: green, fontWeight: FontWeight.w900),
+                                  ),
+                                ),
+                                const SizedBox(width: 12),
+                                Expanded(
+                                  child: Column(
+                                    crossAxisAlignment: CrossAxisAlignment.start,
+                                    children: [
+                                      Text(
+                                        name,
+                                        maxLines: 1,
+                                        overflow: TextOverflow.ellipsis,
+                                        style: const TextStyle(color: dark, fontSize: 14, fontWeight: FontWeight.w900),
+                                      ),
+                                      const SizedBox(height: 3),
+                                      Text(
+                                        classTitle,
+                                        maxLines: 1,
+                                        overflow: TextOverflow.ellipsis,
+                                        style: const TextStyle(color: grey, fontSize: 12, fontWeight: FontWeight.w700),
+                                      ),
+                                    ],
+                                  ),
+                                ),
+                                const Icon(Icons.arrow_forward_ios_rounded, size: 16, color: grey),
+                              ],
+                            ),
+                          ),
+                        );
+                      },
+                    ),
+                  ),
+                ],
+              ),
+            );
+          },
+        );
+      },
+    );
+  }
+
+  Future<void> _openMockTest() async {
+    final selected = await _selectStudentForMockTest();
+    if (selected == null) return;
+
+    final toddlerId = (selected["_id"] ?? selected["id"] ?? "").toString();
+    final toddlerName = (selected["name"] ?? "Student").toString();
+    if (toddlerId.isEmpty) {
+      _toast("Invalid student selected");
+      return;
+    }
+
+    final changed = await Navigator.push<bool>(
+      context,
+      MaterialPageRoute(
+        builder: (_) => ToddlerMockTestScreen(
+          toddlerId: toddlerId,
+          toddlerName: toddlerName,
+          teacherMode: true,
+        ),
+      ),
+    );
+    if (changed == true) await _loadDashboard();
+  }
+
   // ------------------- UI -------------------
 
   @override
@@ -335,7 +515,7 @@ class _TeacherDashboardScreenState extends State<TeacherDashboardScreen> {
                         mainAxisSpacing: 10,
                         shrinkWrap: true,
                         physics: const NeverScrollableScrollPhysics(),
-                        childAspectRatio: MediaQuery.sizeOf(context).width < 370 ? 1.25 : 1.55,
+                        childAspectRatio: MediaQuery.of(context).size.width < 360 ? 1.28 : 1.45,
                         children: [
                           _statCard("1", "Students", "$studentsCount", const Color(0xFFE9F0FF), const Color(0xFF2563EB)),
                           _statCard("2", "Alerts", "$alertsCount", const Color(0xFFFFE9EC), const Color(0xFFEF4444)),
@@ -346,43 +526,75 @@ class _TeacherDashboardScreenState extends State<TeacherDashboardScreen> {
 
                       const SizedBox(height: 12),
 
-                      SingleChildScrollView(
-                        scrollDirection: Axis.horizontal,
-                        physics: const BouncingScrollPhysics(),
-                        child: Row(
-                          children: [
-                            SizedBox(
-                              width: 170,
-                              child: _pillButton(
-                                filled: true,
-                                icon: Icons.add_rounded,
-                                text: "New Assignment",
-                                onTap: () => classes.isEmpty ? _toast("Create a class first") : _openActivityScreen(),
+                      LayoutBuilder(
+                        builder: (context, constraints) {
+                          final gap = constraints.maxWidth < 360 ? 8.0 : 10.0;
+                          final compact = constraints.maxWidth < 380;
+                          final itemWidth = compact
+                              ? (constraints.maxWidth - gap) / 2
+                              : (constraints.maxWidth - (gap * 2)) / 3;
+                          return Wrap(
+                            spacing: gap,
+                            runSpacing: gap,
+                            children: [
+                              SizedBox(
+                                width: itemWidth,
+                                child: _pillButton(
+                                  filled: true,
+                                  icon: Icons.add_rounded,
+                                  text: "New Assignment",
+                                  onTap: () => classes.isEmpty ? _toast("Create a class first") : _openActivityScreen(),
+                                ),
                               ),
-                            ),
-                            const SizedBox(width: 10),
-                            SizedBox(
-                              width: 150,
-                              child: _pillButton(
-                                filled: false,
-                                icon: Icons.insert_chart_outlined_rounded,
-                                text: "View Reports",
-                                onTap: () => _toast("Reports will show once students enroll"),
+                              SizedBox(
+                                width: itemWidth,
+                                child: _pillButton(
+                                  filled: false,
+                                  icon: Icons.quiz_outlined,
+                                  text: "Mock Test",
+                                  onTap: _openMockTest,
+                                ),
                               ),
-                            ),
-                            const SizedBox(width: 10),
-                            SizedBox(
-                              width: 140,
-                              child: _pillButton(
-                                filled: false,
-                                icon: Icons.event_note_rounded,
-                                text: "Meeting ($upcomingCount)",
-                                onTap: _openMeetings,
+                              SizedBox(
+                                width: itemWidth,
+                                child: _pillButton(
+                                  filled: false,
+                                  icon: Icons.event_note_rounded,
+                                  text: "Meeting ($upcomingCount)",
+                                  onTap: _openMeetings,
+                                ),
                               ),
-                            ),
-                          ],
-                        ),
+                            ],
+                          );
+                        },
                       ),
+
+                      const SizedBox(height: 18),
+
+                      Row(
+                        children: [
+                          const Expanded(
+                            child: Text(
+                              "Home Activity",
+                              style: TextStyle(color: dark, fontSize: 14.5, fontWeight: FontWeight.w900),
+                            ),
+                          ),
+                          Text(
+                            "${homeActivityReports.length} Reports",
+                            style: const TextStyle(color: grey, fontSize: 12.5, fontWeight: FontWeight.w700),
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 10),
+                      if (homeActivityReports.isEmpty)
+                        _emptyHomeActivityCard()
+                      else
+                        ...homeActivityReports.map(
+                              (report) => Padding(
+                            padding: const EdgeInsets.only(bottom: 10),
+                            child: _homeActivityCard(report),
+                          ),
+                        ),
 
                       const SizedBox(height: 18),
 
@@ -530,8 +742,6 @@ class _TeacherDashboardScreenState extends State<TeacherDashboardScreen> {
             const SizedBox(height: 4),
             Text(
               label,
-              maxLines: 1,
-              overflow: TextOverflow.ellipsis,
               style: TextStyle(
                 color: color,
                 fontSize: 11.5,
@@ -572,29 +782,24 @@ class _TeacherDashboardScreenState extends State<TeacherDashboardScreen> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Container(
-            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
-            decoration: BoxDecoration(color: bubbleBg, borderRadius: BorderRadius.circular(12)),
-            child: Row(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                Text(bubbleNumber, style: TextStyle(color: bubbleFg, fontWeight: FontWeight.w900, fontSize: 14)),
-                const SizedBox(width: 8),
-                Text(
-                  bubbleLabel,
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                  style: TextStyle(color: bubbleFg, fontWeight: FontWeight.w800, fontSize: 12),
-                ),
-              ],
+          FittedBox(
+            fit: BoxFit.scaleDown,
+            alignment: Alignment.centerLeft,
+            child: Container(
+              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+              decoration: BoxDecoration(color: bubbleBg, borderRadius: BorderRadius.circular(12)),
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Text(bubbleNumber, style: TextStyle(color: bubbleFg, fontWeight: FontWeight.w900, fontSize: 14)),
+                  const SizedBox(width: 8),
+                  Text(bubbleLabel, style: TextStyle(color: bubbleFg, fontWeight: FontWeight.w800, fontSize: 12)),
+                ],
+              ),
             ),
           ),
           const Spacer(),
-          FittedBox(
-            alignment: Alignment.centerLeft,
-            fit: BoxFit.scaleDown,
-            child: Text(value, style: const TextStyle(color: dark, fontSize: 20, fontWeight: FontWeight.w900)),
-          ),
+          Text(value, style: const TextStyle(color: dark, fontSize: 20, fontWeight: FontWeight.w900)),
         ],
       ),
     );
@@ -691,6 +896,135 @@ class _TeacherDashboardScreenState extends State<TeacherDashboardScreen> {
             ),
           ),
         ],
+      ),
+    );
+  }
+
+  Widget _emptyHomeActivityCard() {
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(14),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        border: Border.all(color: border),
+        borderRadius: BorderRadius.circular(14),
+      ),
+      child: Row(
+        children: [
+          Container(
+            width: 44,
+            height: 44,
+            decoration: BoxDecoration(
+              color: const Color(0xFFE8FFF2),
+              borderRadius: BorderRadius.circular(12),
+            ),
+            child: const Icon(Icons.home_work_outlined, color: green),
+          ),
+          const SizedBox(width: 12),
+          const Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  "No home activity reports yet",
+                  style: TextStyle(color: dark, fontWeight: FontWeight.w900),
+                ),
+                SizedBox(height: 4),
+                Text(
+                  "Parent-sent mock test reports will appear here.",
+                  style: TextStyle(color: grey, fontWeight: FontWeight.w600, fontSize: 12.5),
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _homeActivityCard(Map<String, dynamic> report) {
+    final toddlerName = (report["toddlerName"] ?? "Student").toString();
+    final percentage = (report["percentage"] ?? 0).toString();
+    final correct = (report["correctCount"] ?? 0).toString();
+    final total = (report["totalQuestions"] ?? 0).toString();
+    final needsPractice = (report["needsPractice"] as List<dynamic>? ?? []);
+    final completedAt = (report["completedAt"] ?? "").toString();
+    final dateText = completedAt.length >= 10 ? completedAt.substring(0, 10) : "Recent";
+
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(13),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(color: border),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(0.035),
+            blurRadius: 12,
+            offset: const Offset(0, 7),
+          ),
+        ],
+      ),
+      child: Row(
+        children: [
+          Container(
+            width: 46,
+            height: 46,
+            decoration: BoxDecoration(
+              color: const Color(0xFFE8FFF2),
+              borderRadius: BorderRadius.circular(14),
+            ),
+            child: const Icon(Icons.assignment_turned_in_outlined, color: green),
+          ),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  toddlerName,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: const TextStyle(color: dark, fontSize: 13.8, fontWeight: FontWeight.w900),
+                ),
+                const SizedBox(height: 4),
+                Text(
+                  "Parent sent Mock Test • $dateText",
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: const TextStyle(color: grey, fontSize: 11.5, fontWeight: FontWeight.w700),
+                ),
+                const SizedBox(height: 7),
+                Wrap(
+                  spacing: 7,
+                  runSpacing: 6,
+                  children: [
+                    _smallChip("Score $percentage%", const Color(0xFFE8FFF2), green),
+                    _smallChip("$correct/$total Correct", const Color(0xFFEFF6FF), const Color(0xFF2563EB)),
+                    _smallChip("${needsPractice.length} Practice", const Color(0xFFFFE9EC), const Color(0xFFEF4444)),
+                  ],
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _smallChip(String text, Color bgColor, Color textColor) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 5),
+      decoration: BoxDecoration(
+        color: bgColor,
+        borderRadius: BorderRadius.circular(999),
+      ),
+      child: Text(
+        text,
+        maxLines: 1,
+        overflow: TextOverflow.ellipsis,
+        style: TextStyle(color: textColor, fontSize: 10.8, fontWeight: FontWeight.w900),
       ),
     );
   }
