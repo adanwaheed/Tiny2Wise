@@ -706,13 +706,15 @@ class _StoryTellingScreenState extends State<StoryTellingScreen> {
             ],
           ),
           const SizedBox(height: 10),
-          Row(
+          Wrap(
+            spacing: 8,
+            runSpacing: 8,
+            crossAxisAlignment: WrapCrossAlignment.center,
             children: [
               _smallActionButton(
                 icon: _currentlyPlayingId == storyId ? Icons.stop : Icons.play_arrow_rounded,
                 onTap: () => _playOrStopStory(story),
               ),
-              const SizedBox(width: 8),
               _smallActionButton(
                 icon: Icons.close_rounded,
                 onTap: () async {
@@ -722,7 +724,6 @@ class _StoryTellingScreenState extends State<StoryTellingScreen> {
                   }
                 },
               ),
-              const SizedBox(width: 8),
               _smallActionButton(
                 icon: Icons.delete_outline,
                 onTap: () async {
@@ -732,7 +733,6 @@ class _StoryTellingScreenState extends State<StoryTellingScreen> {
                   }
                 },
               ),
-              const Spacer(),
               InkWell(
                 onTap: () => _assignStory(story),
                 borderRadius: BorderRadius.circular(10),
@@ -746,6 +746,7 @@ class _StoryTellingScreenState extends State<StoryTellingScreen> {
                     ),
                   ),
                   child: Row(
+                    mainAxisSize: MainAxisSize.min,
                     children: [
                       Icon(
                         Icons.person_add_alt_1_outlined,
@@ -759,6 +760,8 @@ class _StoryTellingScreenState extends State<StoryTellingScreen> {
                             : assignedToddlerIds.isNotEmpty
                             ? "Assigned (${assignedToddlerIds.length})"
                             : "Assign",
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
                         style: TextStyle(
                           color: assignedToAll ? Colors.white : dark,
                           fontSize: 12,
@@ -878,6 +881,7 @@ class _StoryTellingScreenState extends State<StoryTellingScreen> {
       body: RefreshIndicator(
         onRefresh: _loadAll,
         child: ListView(
+          physics: const AlwaysScrollableScrollPhysics(),
           padding: const EdgeInsets.fromLTRB(12, 10, 12, 24),
           children: [
             Container(

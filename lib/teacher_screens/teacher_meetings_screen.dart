@@ -310,6 +310,7 @@ class _TeacherMeetingsScreenState extends State<TeacherMeetingsScreen> {
         color: green,
         backgroundColor: Colors.white,
         child: ListView(
+          physics: const AlwaysScrollableScrollPhysics(),
           padding: const EdgeInsets.fromLTRB(16, 10, 16, 16),
           children: [
             if (events.isEmpty)

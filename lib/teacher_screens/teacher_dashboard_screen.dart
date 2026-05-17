@@ -335,7 +335,7 @@ class _TeacherDashboardScreenState extends State<TeacherDashboardScreen> {
                         mainAxisSpacing: 10,
                         shrinkWrap: true,
                         physics: const NeverScrollableScrollPhysics(),
-                        childAspectRatio: 1.55,
+                        childAspectRatio: MediaQuery.sizeOf(context).width < 370 ? 1.25 : 1.55,
                         children: [
                           _statCard("1", "Students", "$studentsCount", const Color(0xFFE9F0FF), const Color(0xFF2563EB)),
                           _statCard("2", "Alerts", "$alertsCount", const Color(0xFFFFE9EC), const Color(0xFFEF4444)),
@@ -530,6 +530,8 @@ class _TeacherDashboardScreenState extends State<TeacherDashboardScreen> {
             const SizedBox(height: 4),
             Text(
               label,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
               style: TextStyle(
                 color: color,
                 fontSize: 11.5,
@@ -578,12 +580,21 @@ class _TeacherDashboardScreenState extends State<TeacherDashboardScreen> {
               children: [
                 Text(bubbleNumber, style: TextStyle(color: bubbleFg, fontWeight: FontWeight.w900, fontSize: 14)),
                 const SizedBox(width: 8),
-                Text(bubbleLabel, style: TextStyle(color: bubbleFg, fontWeight: FontWeight.w800, fontSize: 12)),
+                Text(
+                  bubbleLabel,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: TextStyle(color: bubbleFg, fontWeight: FontWeight.w800, fontSize: 12),
+                ),
               ],
             ),
           ),
           const Spacer(),
-          Text(value, style: const TextStyle(color: dark, fontSize: 20, fontWeight: FontWeight.w900)),
+          FittedBox(
+            alignment: Alignment.centerLeft,
+            fit: BoxFit.scaleDown,
+            child: Text(value, style: const TextStyle(color: dark, fontSize: 20, fontWeight: FontWeight.w900)),
+          ),
         ],
       ),
     );

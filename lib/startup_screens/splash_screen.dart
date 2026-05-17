@@ -61,135 +61,145 @@ class _SplashScreenState extends State<SplashScreen>
             const _WatermarkIcons(),
 
             // Main content
-            Center(
-              child: Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 22),
-                child: Column(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: [
-                    // Logo block (rounded square + inner logo)
-                    Container(
-                      width: 180,
-                      height: 180,
-                      decoration: BoxDecoration(
-                        color: const Color(0xFF499A54).withOpacity(0.35), // #F8FFF9
-                        borderRadius: BorderRadius.circular(22),
-                      ),
-                      alignment: Alignment.center,
-                      child: Container(
-                        width: 160,
-                        height: 160,
-                        decoration: BoxDecoration(
-                          color: Color(0xFFDEDEA4),
-                          borderRadius: BorderRadius.circular(16),
-                        ),
-                        child: Padding(
-                          padding: const EdgeInsets.all(14),
-                          child: Image.asset(
-                            "assets/logo.png",
-                            fit: BoxFit.contain,
-                          ),
-                        ),
-                      ),
-                    ),
-
-                    const SizedBox(height: 22),
-
-                    // Tiny2Wise text (with green "2")
-                    RichText(
-                      text: const TextSpan(
-                        style: TextStyle(
-                          fontSize: 34,
-                          fontWeight: FontWeight.w600,
-                          color: textDark,
-                          height: 1.1,
-                        ),
-                        children: [
-                          TextSpan(text: "Tiny"),
-                          TextSpan(
-                            text: "2",
-                            style: TextStyle(color: green),
-                          ),
-                          TextSpan(text: "Wise"),
-                        ],
-                      ),
-                    ),
-
-                    const SizedBox(height: 10),
-
-                    // Tagline
-                    const Text(
-                      "Voice Across Generations 🌱",
-                      style: TextStyle(
-                        color: textGrey,
-                        fontSize: 12.5,
-                        fontWeight: FontWeight.w500,
-                      ),
-                    ),
-
-                    const SizedBox(height: 46),
-
-                    // Loading + percent line
-                    AnimatedBuilder(
-                      animation: _progress,
-                      builder: (context, _) {
-                        final percent = (_progress.value * 100).round();
-
-                        return Column(
+            LayoutBuilder(
+              builder: (context, constraints) {
+                return SingleChildScrollView(
+                  physics: const AlwaysScrollableScrollPhysics(),
+                  child: ConstrainedBox(
+                    constraints: BoxConstraints(minHeight: constraints.maxHeight),
+                    child: Center(
+                      child: Padding(
+                        padding: const EdgeInsets.symmetric(horizontal: 22, vertical: 24),
+                        child: Column(
+                          mainAxisAlignment: MainAxisAlignment.center,
                           children: [
-                            Row(
-                              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                              children: [
-                                const Text(
-                                  "Loading your experience...",
-                                  style: TextStyle(
-                                    color: textGrey,
-                                    fontSize: 12,
-                                    fontWeight: FontWeight.w500,
+                            // Logo block (rounded square + inner logo)
+                            Container(
+                              width: 180,
+                              height: 180,
+                              decoration: BoxDecoration(
+                                color: const Color(0xFF499A54).withOpacity(0.35), // #F8FFF9
+                                borderRadius: BorderRadius.circular(22),
+                              ),
+                              alignment: Alignment.center,
+                              child: Container(
+                                width: 160,
+                                height: 160,
+                                decoration: BoxDecoration(
+                                  color: Color(0xFFDEDEA4),
+                                  borderRadius: BorderRadius.circular(16),
+                                ),
+                                child: Padding(
+                                  padding: const EdgeInsets.all(14),
+                                  child: Image.asset(
+                                    "assets/logo.png",
+                                    fit: BoxFit.contain,
                                   ),
                                 ),
-                                Text(
-                                  "$percent%",
-                                  style: const TextStyle(
-                                    color: textGrey,
-                                    fontSize: 12,
-                                    fontWeight: FontWeight.w500,
-                                  ),
-                                ),
-                              ],
+                              ),
                             ),
-                            const SizedBox(height: 10),
 
-                            // Progress bar
-                            ClipRRect(
-                              borderRadius: BorderRadius.circular(20),
-                              child: LinearProgressIndicator(
-                                value: _progress.value,
-                                minHeight: 6,
-                                backgroundColor: const Color(0xFFDDE8D9),
-                                valueColor:
-                                const AlwaysStoppedAnimation<Color>(green),
+                            const SizedBox(height: 22),
+
+                            // Tiny2Wise text (with green "2")
+                            RichText(
+                              text: const TextSpan(
+                                style: TextStyle(
+                                  fontSize: 34,
+                                  fontWeight: FontWeight.w600,
+                                  color: textDark,
+                                  height: 1.1,
+                                ),
+                                children: [
+                                  TextSpan(text: "Tiny"),
+                                  TextSpan(
+                                    text: "2",
+                                    style: TextStyle(color: green),
+                                  ),
+                                  TextSpan(text: "Wise"),
+                                ],
                               ),
                             ),
 
                             const SizedBox(height: 10),
 
-                            // Version
+                            // Tagline
                             const Text(
-                              "v3.0.1",
+                              "Voice Across Generations 🌱",
                               style: TextStyle(
                                 color: textGrey,
-                                fontSize: 11,
+                                fontSize: 12.5,
                                 fontWeight: FontWeight.w500,
                               ),
                             ),
+
+                            const SizedBox(height: 46),
+
+                            // Loading + percent line
+                            AnimatedBuilder(
+                              animation: _progress,
+                              builder: (context, _) {
+                                final percent = (_progress.value * 100).round();
+
+                                return Column(
+                                  children: [
+                                    Row(
+                                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                                      children: [
+                                        const Text(
+                                          "Loading your experience...",
+                                          style: TextStyle(
+                                            color: textGrey,
+                                            fontSize: 12,
+                                            fontWeight: FontWeight.w500,
+                                          ),
+                                        ),
+                                        Text(
+                                          "$percent%",
+                                          style: const TextStyle(
+                                            color: textGrey,
+                                            fontSize: 12,
+                                            fontWeight: FontWeight.w500,
+                                          ),
+                                        ),
+                                      ],
+                                    ),
+                                    const SizedBox(height: 10),
+
+                                    // Progress bar
+                                    ClipRRect(
+                                      borderRadius: BorderRadius.circular(20),
+                                      child: LinearProgressIndicator(
+                                        value: _progress.value,
+                                        minHeight: 6,
+                                        backgroundColor: const Color(0xFFDDE8D9),
+                                        valueColor:
+                                        const AlwaysStoppedAnimation<Color>(green),
+                                      ),
+                                    ),
+
+                                    const SizedBox(height: 10),
+
+                                    // Version
+                                    const Text(
+                                      "v3.0.1",
+                                      style: TextStyle(
+                                        color: textGrey,
+                                        fontSize: 11,
+                                        fontWeight: FontWeight.w500,
+                                      ),
+                                    ),
+                                  ],
+                                );
+                              },
+                            ),
                           ],
-                        );
-                      },
+                        ),
+                      ),
                     ),
-                  ],
-                ),
-              ),
+                  ),
+                );
+              },
             ),
           ],
         ),

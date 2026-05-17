@@ -1,5 +1,3 @@
-// flutter run --dart-define=API_BASE_URL=http://192.168.1.38:3000
-
 import 'dart:convert';
 import 'dart:io';
 import 'dart:typed_data';
@@ -301,16 +299,7 @@ class ApiService {
 
   // -------------------- TODDLER 3D AVATAR / GEMINI CHAT --------------------
 
-  /// Sends the toddler's real spoken/typed question to the backend.
-  ///
-  /// Backend route:
-  /// POST /api/toddler/avatar-chat
-  ///
-  /// languageMode:
-  /// - 'auto'    => backend detects English/Urdu from message
-  /// - 'english' => force simple English reply
-  /// - 'urdu'    => force simple Urdu reply
-  static Future<String> sendToddlerMessage({
+  static Future<String> sendToddlerAvatarMessage({
     required String message,
     String languageMode = 'auto',
     String? toddlerId,
@@ -328,7 +317,8 @@ class ApiService {
       Uri.parse('$baseUrl/api/toddler/avatar-chat'),
       headers: {
         'Content-Type': 'application/json',
-        if (token != null && token.isNotEmpty) 'Authorization': 'Bearer $token',
+        if (token != null && token.isNotEmpty)
+          'Authorization': 'Bearer $token',
       },
       body: jsonEncode({
         'message': cleanMessage,
@@ -359,81 +349,6 @@ class ApiService {
     }
 
     return reply;
-  }
-
-  /// Same as sendToddlerMessage but kept for old screen code compatibility.
-  /// This does NOT hide backend/Gemini errors. If Gemini fails, it throws the real error.
-  static Future<String> sendToddlerAvatarMessage({
-    required String message,
-    String languageMode = 'auto',
-    String? toddlerId,
-  }) async {
-    return sendToddlerMessage(
-      message: message,
-      languageMode: languageMode,
-      toddlerId: toddlerId,
-    );
-  }
-
-  /// Returns full backend JSON response:
-  /// { reply, modelUsed, inputLanguage }
-  static Future<Map<String, dynamic>> sendToddlerAvatarMessageRaw({
-    required String message,
-    String languageMode = 'auto',
-    String? toddlerId,
-  }) async {
-    final cleanMessage = message.trim();
-
-    if (cleanMessage.isEmpty) {
-      throw 'Message is empty';
-    }
-
-    final token = await getToken();
-
-    final response = await http
-        .post(
-      Uri.parse('$baseUrl/api/toddler/avatar-chat'),
-      headers: {
-        'Content-Type': 'application/json',
-        if (token != null && token.isNotEmpty) 'Authorization': 'Bearer $token',
-      },
-      body: jsonEncode({
-        'message': cleanMessage,
-        'languageMode': languageMode,
-        if (toddlerId != null && toddlerId.trim().isNotEmpty)
-          'toddlerId': toddlerId.trim(),
-      }),
-    )
-        .timeout(const Duration(seconds: 75));
-
-    final data = _safeJson(response.body);
-
-    if (response.statusCode < 200 || response.statusCode >= 300) {
-      final msg = data['message']?.toString() ?? 'Avatar reply failed';
-      final err = data['error']?.toString();
-
-      if (err != null && err.isNotEmpty) {
-        throw '$msg: $err';
-      }
-
-      throw msg;
-    }
-
-    return data;
-  }
-
-  /// Useful for typed testing:
-  /// final reply = await ApiService.askToddlerAvatarQuestion('What color is an apple?');
-  static Future<String> askToddlerAvatarQuestion(
-      String question, {
-        String languageMode = 'auto',
-        String? toddlerId,
-      }) async {
-    return sendToddlerMessage(
-      message: question,
-      languageMode: languageMode,
-      toddlerId: toddlerId,
-    );
   }
 
   // -------------------- STORY STUDIO --------------------
@@ -1037,7 +952,14 @@ class ApiService {
 
   // -------------------- URDU NEWS --------------------
 
-  static Future<Map<String, dynamic>> refreshNews() async {
+  static Future<Map<String, dynamic>> refreshNews({
+    int days = 7,
+    int limit = 10,
+    String query = '',
+    String topic = '',
+    bool savedOnly = false,
+    bool clearCache = true,
+  }) async {
     final headers = await _authHeaders();
 
     final res = await http
@@ -1046,9 +968,20 @@ class ApiService {
       headers: {
         ...headers,
         'Content-Type': 'application/json',
+        'Cache-Control': 'no-cache',
+        'Pragma': 'no-cache',
       },
+      body: jsonEncode({
+        'days': days,
+        'limit': limit,
+        'query': query.trim(),
+        'topic': topic.trim(),
+        'savedOnly': savedOnly,
+        'clearCache': clearCache,
+        'cacheBust': DateTime.now().millisecondsSinceEpoch,
+      }),
     )
-        .timeout(const Duration(seconds: 120));
+        .timeout(const Duration(seconds: 150));
 
     final data = _safeJson(res.body);
     if (res.statusCode != 200) {
@@ -1064,24 +997,35 @@ class ApiService {
     String query = '',
     String topic = '',
     bool savedOnly = false,
+    bool forceRefresh = false,
   }) async {
     final headers = await _authHeaders();
 
-    Future<Map<String, dynamic>> fetchOnce() async {
+    Future<Map<String, dynamic>> fetchOnce({bool refresh = false}) async {
       final uri = Uri.parse('$baseUrl/api/news').replace(
         queryParameters: {
           'days': days.toString(),
           'page': page.toString(),
           'limit': limit.toString(),
+          '_ts': DateTime.now().millisecondsSinceEpoch.toString(),
           if (query.trim().isNotEmpty) 'query': query.trim(),
           if (topic.trim().isNotEmpty) 'topic': topic.trim(),
           if (savedOnly) 'savedOnly': '1',
+          if (refresh) 'refresh': '1',
+          if (refresh) 'clearCache': '1',
         },
       );
 
       final res = await http
-          .get(uri, headers: headers)
-          .timeout(const Duration(seconds: 45));
+          .get(
+        uri,
+        headers: {
+          ...headers,
+          'Cache-Control': 'no-cache',
+          'Pragma': 'no-cache',
+        },
+      )
+          .timeout(Duration(seconds: refresh ? 150 : 45));
 
       final data = _safeJson(res.body);
       if (res.statusCode != 200) {
@@ -1090,9 +1034,9 @@ class ApiService {
       return data;
     }
 
-    var data = await fetchOnce();
+    var data = await fetchOnce(refresh: forceRefresh && page == 1 && !savedOnly);
     final firstPage = page == 1;
-    final shouldRetry = firstPage && query.trim().isEmpty && topic.trim().isEmpty && !savedOnly &&
+    final shouldRetry = firstPage && query.trim().isEmpty && topic.trim().isEmpty && !savedOnly && !forceRefresh &&
         ((data['articles'] as List?)?.isEmpty ?? true);
 
     if (!shouldRetry) {
@@ -1100,8 +1044,7 @@ class ApiService {
     }
 
     try {
-      await refreshNews();
-      data = await fetchOnce();
+      data = await refreshNews(days: days, limit: limit, query: query, topic: topic);
     } catch (_) {
       // Keep the original empty response if refresh fails.
     }

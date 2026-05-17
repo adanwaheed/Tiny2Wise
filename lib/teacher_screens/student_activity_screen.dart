@@ -713,43 +713,65 @@ class _StudentActivityScreenState extends State<StudentActivityScreen> {
   }) {
     return Expanded(
       child: SizedBox(
-        height: 40,
+        height: 42,
         child: filled
-            ? ElevatedButton.icon(
+            ? ElevatedButton(
           style: ElevatedButton.styleFrom(
             backgroundColor: color,
             elevation: 0,
+            padding: const EdgeInsets.symmetric(horizontal: 8),
             shape: RoundedRectangleBorder(
               borderRadius: BorderRadius.circular(12),
             ),
           ),
           onPressed: onTap,
-          icon: Icon(icon, size: 16, color: Colors.white),
-          label: Text(
-            label,
-            style: const TextStyle(
-              color: Colors.white,
-              fontWeight: FontWeight.w900,
-              fontSize: 12.5,
-            ),
+          child: Row(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              Icon(icon, size: 16, color: Colors.white),
+              const SizedBox(width: 6),
+              Flexible(
+                child: Text(
+                  label,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: const TextStyle(
+                    color: Colors.white,
+                    fontWeight: FontWeight.w900,
+                    fontSize: 12,
+                  ),
+                ),
+              ),
+            ],
           ),
         )
-            : OutlinedButton.icon(
+            : OutlinedButton(
           style: OutlinedButton.styleFrom(
+            padding: const EdgeInsets.symmetric(horizontal: 8),
             side: BorderSide(color: color.withOpacity(0.35)),
             shape: RoundedRectangleBorder(
               borderRadius: BorderRadius.circular(12),
             ),
           ),
           onPressed: onTap,
-          icon: Icon(icon, size: 16, color: color),
-          label: Text(
-            label,
-            style: TextStyle(
-              color: color,
-              fontWeight: FontWeight.w900,
-              fontSize: 12.5,
-            ),
+          child: Row(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              Icon(icon, size: 16, color: color),
+              const SizedBox(width: 6),
+              Flexible(
+                child: Text(
+                  label,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: TextStyle(
+                    color: color,
+                    fontWeight: FontWeight.w900,
+                    fontSize: 12,
+                  ),
+                ),
+              ),
+            ],
           ),
         ),
       ),
@@ -805,41 +827,48 @@ class _StudentActivityScreenState extends State<StudentActivityScreen> {
                   ),
                 ),
                 const SizedBox(height: 12),
-                Row(
-                  children: [
-                    Expanded(
-                      child: _TargetCard(
-                        title: "Single Child",
-                        subtitle: "Assign to one student",
-                        icon: Icons.person_outline_rounded,
-                        selected: selectedTarget == "single",
-                        onTap: () =>
-                            setState(() => selectedTarget = "single"),
-                      ),
-                    ),
-                    const SizedBox(width: 10),
-                    Expanded(
-                      child: _TargetCard(
-                        title: "Small Group",
-                        subtitle: "2-5 students",
-                        icon: Icons.groups_2_outlined,
-                        selected: selectedTarget == "group",
-                        onTap: () =>
-                            setState(() => selectedTarget = "group"),
-                      ),
-                    ),
-                    const SizedBox(width: 10),
-                    Expanded(
-                      child: _TargetCard(
-                        title: "Full Class",
-                        subtitle: "All students",
-                        icon: Icons.groups_rounded,
-                        selected: selectedTarget == "class",
-                        onTap: () =>
-                            setState(() => selectedTarget = "class"),
-                      ),
-                    ),
-                  ],
+                LayoutBuilder(
+                  builder: (context, constraints) {
+                    final itemWidth = constraints.maxWidth < 360
+                        ? constraints.maxWidth
+                        : (constraints.maxWidth - 20) / 3;
+                    return Wrap(
+                      spacing: 10,
+                      runSpacing: 10,
+                      children: [
+                        SizedBox(
+                          width: itemWidth,
+                          child: _TargetCard(
+                            title: "Single Child",
+                            subtitle: "Assign to one student",
+                            icon: Icons.person_outline_rounded,
+                            selected: selectedTarget == "single",
+                            onTap: () => setState(() => selectedTarget = "single"),
+                          ),
+                        ),
+                        SizedBox(
+                          width: itemWidth,
+                          child: _TargetCard(
+                            title: "Small Group",
+                            subtitle: "2-5 students",
+                            icon: Icons.groups_2_outlined,
+                            selected: selectedTarget == "group",
+                            onTap: () => setState(() => selectedTarget = "group"),
+                          ),
+                        ),
+                        SizedBox(
+                          width: itemWidth,
+                          child: _TargetCard(
+                            title: "Full Class",
+                            subtitle: "All students",
+                            icon: Icons.groups_rounded,
+                            selected: selectedTarget == "class",
+                            onTap: () => setState(() => selectedTarget = "class"),
+                          ),
+                        ),
+                      ],
+                    );
+                  },
                 ),
                 const SizedBox(height: 14),
                 Container(
@@ -1176,6 +1205,8 @@ class _TargetCard extends StatelessWidget {
             const SizedBox(height: 10),
             Text(
               title,
+              maxLines: 2,
+              overflow: TextOverflow.ellipsis,
               textAlign: TextAlign.center,
               style: const TextStyle(
                 color: dark,
@@ -1186,6 +1217,8 @@ class _TargetCard extends StatelessWidget {
             const SizedBox(height: 4),
             Text(
               subtitle,
+              maxLines: 2,
+              overflow: TextOverflow.ellipsis,
               textAlign: TextAlign.center,
               style: const TextStyle(
                 color: grey,
@@ -1249,6 +1282,8 @@ class _ActivityOptionCard extends StatelessWidget {
                 children: [
                   Text(
                     title,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
                     style: const TextStyle(
                       color: dark,
                       fontSize: 14,
@@ -1258,6 +1293,8 @@ class _ActivityOptionCard extends StatelessWidget {
                   const SizedBox(height: 2),
                   Text(
                     subtitle,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
                     style: const TextStyle(
                       color: grey,
                       fontSize: 12,

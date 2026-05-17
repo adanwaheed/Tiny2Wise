@@ -21,7 +21,6 @@ class ParentDashboardScreen extends StatefulWidget {
 
 class _ParentDashboardScreenState extends State<ParentDashboardScreen>
     with TickerProviderStateMixin {
-  // Green + White theme
   static const Color bg = Color(0xFFF4FFF6);
   static const Color green = Color(0xFF27C267);
   static const Color greenDark = Color(0xFF179C4C);
@@ -1243,11 +1242,15 @@ class _ActivityCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final width = MediaQuery.sizeOf(context).width;
+    final compact = width < 370;
+    final iconSize = compact ? 42.0 : 48.0;
+
     return _PressableCard(
       onTap: onTap,
       child: Container(
-        height: 108,
-        padding: const EdgeInsets.all(14),
+        constraints: const BoxConstraints(minHeight: 118),
+        padding: EdgeInsets.all(compact ? 10 : 12),
         decoration: BoxDecoration(
           color: bg,
           borderRadius: BorderRadius.circular(20),
@@ -1263,8 +1266,8 @@ class _ActivityCard extends StatelessWidget {
         child: Row(
           children: [
             Container(
-              width: 52,
-              height: 52,
+              width: iconSize,
+              height: iconSize,
               decoration: BoxDecoration(
                 color: iconBg,
                 shape: BoxShape.circle,
@@ -1276,21 +1279,42 @@ class _ActivityCard extends StatelessWidget {
                   )
                 ],
               ),
-              child: Icon(icon, color: Colors.white, size: 22),
+              child: Icon(icon, color: Colors.white, size: compact ? 18 : 20),
             ),
-            const SizedBox(width: 12),
+            SizedBox(width: compact ? 8 : 10),
             Expanded(
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 mainAxisAlignment: MainAxisAlignment.center,
                 children: [
-                  Text(title, style: const TextStyle(color: dark, fontSize: 14.5, fontWeight: FontWeight.w900)),
+                  Text(
+                    title,
+                    maxLines: 2,
+                    overflow: TextOverflow.ellipsis,
+                    style: TextStyle(
+                      color: dark,
+                      fontSize: compact ? 12.4 : 13.6,
+                      fontWeight: FontWeight.w900,
+                      height: 1.12,
+                    ),
+                  ),
                   const SizedBox(height: 4),
-                  Text(subtitle, style: const TextStyle(color: grey, fontSize: 11.5, fontWeight: FontWeight.w800)),
+                  Text(
+                    subtitle,
+                    maxLines: 2,
+                    overflow: TextOverflow.ellipsis,
+                    style: TextStyle(
+                      color: grey,
+                      fontSize: compact ? 10.6 : 11.2,
+                      fontWeight: FontWeight.w800,
+                      height: 1.15,
+                    ),
+                  ),
                 ],
               ),
             ),
-            const Icon(Icons.chevron_right_rounded, color: Color(0xFF9FB1A8)),
+            if (!compact)
+              const Icon(Icons.chevron_right_rounded, color: Color(0xFF9FB1A8)),
           ],
         ),
       ),

@@ -41,7 +41,9 @@ class _UrduNewsScreenState extends State<UrduNewsScreen> {
   @override
   void initState() {
     super.initState();
-    _loadNews(reset: true);
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted) _refreshNow();
+    });
   }
 
   TextStyle _urduCardTitleStyle() {
@@ -137,10 +139,40 @@ class _UrduNewsScreenState extends State<UrduNewsScreen> {
 
   Future<void> _refreshNow() async {
     if (_refreshing) return;
-    setState(() => _refreshing = true);
+    setState(() {
+      _refreshing = true;
+      _loading = true;
+      _page = 1;
+      _hasMore = true;
+    });
+
     try {
-      await ApiService.refreshNews();
-      await _loadNews(reset: true);
+      final data = await ApiService.refreshNews(
+        days: _selectedDays,
+        limit: 30,
+        query: _query,
+        topic: _selectedTopic,
+        clearCache: true,
+      );
+
+      final fetched = (data['articles'] as List<dynamic>? ?? [])
+          .map((e) => NewsArticle.fromJson(Map<String, dynamic>.from(e as Map)))
+          .toList();
+
+
+      if (!mounted) return;
+      setState(() {
+        _articles
+          ..clear()
+          ..addAll(fetched);
+        _hasMore = false;
+        _page = 1;
+      });
+
+      final updatedCount = (data['insertedOrUpdated'] as num?)?.toInt() ?? fetched.length;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Latest news refreshed ($updatedCount crawled)')),
+      );
     } catch (e) {
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
@@ -148,7 +180,10 @@ class _UrduNewsScreenState extends State<UrduNewsScreen> {
       );
     } finally {
       if (!mounted) return;
-      setState(() => _refreshing = false);
+      setState(() {
+        _refreshing = false;
+        _loading = false;
+      });
     }
   }
 
@@ -161,51 +196,53 @@ class _UrduNewsScreenState extends State<UrduNewsScreen> {
       ),
       builder: (context) {
         return SafeArea(
-          child: Padding(
-            padding: const EdgeInsets.fromLTRB(16, 16, 16, 24),
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                const Text(
-                  'Choose News Category',
-                  style: TextStyle(fontSize: 18, fontWeight: FontWeight.w700),
-                ),
-                const SizedBox(height: 6),
-                const Text(
-                  'Tap one category to filter the latest summarized news.',
-                  style: TextStyle(color: textGrey, fontSize: 13),
-                ),
-                const SizedBox(height: 16),
-                for (final item in _topics)
-                  ListTile(
-                    contentPadding: EdgeInsets.zero,
-                    leading: CircleAvatar(
-                      backgroundColor: item['key'] == _selectedTopic
-                          ? green.withOpacity(0.16)
-                          : const Color(0xFFF1F4EF),
-                      child: Icon(
-                        item['key'] == 'education'
-                            ? Icons.school_rounded
-                            : item['key'] == 'sports'
-                            ? Icons.sports_cricket_rounded
-                            : item['key'] == 'politics'
-                            ? Icons.account_balance_rounded
-                            : Icons.newspaper_rounded,
-                        color: item['key'] == _selectedTopic ? green : dark,
-                      ),
-                    ),
-                    title: Text(
-                      item['label'] ?? '',
-                      style: const TextStyle(fontWeight: FontWeight.w700),
-                    ),
-                    subtitle: Text(item['urdu'] ?? ''),
-                    trailing: item['key'] == _selectedTopic
-                        ? const Icon(Icons.check_circle_rounded, color: green)
-                        : null,
-                    onTap: () => Navigator.pop(context, item['key']),
+          child: SingleChildScrollView(
+            child: Padding(
+              padding: const EdgeInsets.fromLTRB(16, 16, 16, 24),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  const Text(
+                    'Choose News Category',
+                    style: TextStyle(fontSize: 18, fontWeight: FontWeight.w700),
                   ),
-              ],
+                  const SizedBox(height: 6),
+                  const Text(
+                    'Tap one category to filter the latest summarized news.',
+                    style: TextStyle(color: textGrey, fontSize: 13),
+                  ),
+                  const SizedBox(height: 16),
+                  for (final item in _topics)
+                    ListTile(
+                      contentPadding: EdgeInsets.zero,
+                      leading: CircleAvatar(
+                        backgroundColor: item['key'] == _selectedTopic
+                            ? green.withOpacity(0.16)
+                            : const Color(0xFFF1F4EF),
+                        child: Icon(
+                          item['key'] == 'education'
+                              ? Icons.school_rounded
+                              : item['key'] == 'sports'
+                              ? Icons.sports_cricket_rounded
+                              : item['key'] == 'politics'
+                              ? Icons.account_balance_rounded
+                              : Icons.newspaper_rounded,
+                          color: item['key'] == _selectedTopic ? green : dark,
+                        ),
+                      ),
+                      title: Text(
+                        item['label'] ?? '',
+                        style: const TextStyle(fontWeight: FontWeight.w700),
+                      ),
+                      subtitle: Text(item['urdu'] ?? ''),
+                      trailing: item['key'] == _selectedTopic
+                          ? const Icon(Icons.check_circle_rounded, color: green)
+                          : null,
+                      onTap: () => Navigator.pop(context, item['key']),
+                    ),
+                ],
+              ),
             ),
           ),
         );
@@ -217,7 +254,12 @@ class _UrduNewsScreenState extends State<UrduNewsScreen> {
       _selectedTopic = result;
       _query = '';
     });
-    await _loadNews(reset: true);
+
+    if (_selectedTopic.isNotEmpty) {
+      await _refreshNow();
+    } else {
+      await _loadNews(reset: true);
+    }
   }
 
   String _timeAgo(DateTime? dateTime) {
@@ -286,7 +328,6 @@ class _UrduNewsScreenState extends State<UrduNewsScreen> {
             builder: (_) => NewsSummaryScreen(initialArticle: article),
           ),
         );
-        await _loadNews(reset: true);
       },
       child: Container(
         margin: const EdgeInsets.only(bottom: 14),
@@ -541,29 +582,32 @@ class _UrduNewsScreenState extends State<UrduNewsScreen> {
               ),
               if (_selectedTopic.isNotEmpty) ...[
                 const SizedBox(height: 14),
-                Row(
-                  children: [
-                    Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-                      decoration: BoxDecoration(
-                        color: Colors.white,
-                        borderRadius: BorderRadius.circular(14),
-                        border: Border.all(color: cardBorder),
+                SingleChildScrollView(
+                  scrollDirection: Axis.horizontal,
+                  child: Row(
+                    children: [
+                      Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                        decoration: BoxDecoration(
+                          color: Colors.white,
+                          borderRadius: BorderRadius.circular(14),
+                          border: Border.all(color: cardBorder),
+                        ),
+                        child: Text(
+                          'Category: $_selectedTopicLabel',
+                          style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w600),
+                        ),
                       ),
-                      child: Text(
-                        'Category: $_selectedTopicLabel',
-                        style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w600),
+                      const SizedBox(width: 8),
+                      TextButton(
+                        onPressed: () async {
+                          setState(() => _selectedTopic = '');
+                          await _loadNews(reset: true);
+                        },
+                        child: const Text('Clear'),
                       ),
-                    ),
-                    const SizedBox(width: 8),
-                    TextButton(
-                      onPressed: () async {
-                        setState(() => _selectedTopic = '');
-                        await _loadNews(reset: true);
-                      },
-                      child: const Text('Clear'),
-                    ),
-                  ],
+                    ],
+                  ),
                 ),
               ],
               const SizedBox(height: 18),

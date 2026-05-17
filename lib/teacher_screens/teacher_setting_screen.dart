@@ -263,6 +263,7 @@ class _TeacherSettingScreenState extends State<TeacherSettingScreen> {
             color: green,
             backgroundColor: Colors.white,
             child: ListView(
+              physics: const AlwaysScrollableScrollPhysics(),
               padding: const EdgeInsets.fromLTRB(16, 12, 16, 16),
               children: [
                 const Text(

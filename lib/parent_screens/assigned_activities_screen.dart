@@ -228,43 +228,65 @@ class _AssignedActivitiesScreenState extends State<AssignedActivitiesScreen> {
   }) {
     return Expanded(
       child: SizedBox(
-        height: 40,
+        height: 42,
         child: filled
-            ? ElevatedButton.icon(
+            ? ElevatedButton(
           style: ElevatedButton.styleFrom(
             backgroundColor: color,
             elevation: 0,
+            padding: const EdgeInsets.symmetric(horizontal: 8),
             shape: RoundedRectangleBorder(
               borderRadius: BorderRadius.circular(12),
             ),
           ),
           onPressed: onTap,
-          icon: Icon(icon, size: 16, color: Colors.white),
-          label: Text(
-            label,
-            style: const TextStyle(
-              color: Colors.white,
-              fontWeight: FontWeight.w900,
-              fontSize: 12.5,
-            ),
+          child: Row(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              Icon(icon, size: 16, color: Colors.white),
+              const SizedBox(width: 6),
+              Flexible(
+                child: Text(
+                  label,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: const TextStyle(
+                    color: Colors.white,
+                    fontWeight: FontWeight.w900,
+                    fontSize: 12,
+                  ),
+                ),
+              ),
+            ],
           ),
         )
-            : OutlinedButton.icon(
+            : OutlinedButton(
           style: OutlinedButton.styleFrom(
+            padding: const EdgeInsets.symmetric(horizontal: 8),
             side: BorderSide(color: color.withOpacity(0.35)),
             shape: RoundedRectangleBorder(
               borderRadius: BorderRadius.circular(12),
             ),
           ),
           onPressed: onTap,
-          icon: Icon(icon, size: 16, color: color),
-          label: Text(
-            label,
-            style: TextStyle(
-              color: color,
-              fontWeight: FontWeight.w900,
-              fontSize: 12.5,
-            ),
+          child: Row(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              Icon(icon, size: 16, color: color),
+              const SizedBox(width: 6),
+              Flexible(
+                child: Text(
+                  label,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: TextStyle(
+                    color: color,
+                    fontWeight: FontWeight.w900,
+                    fontSize: 12,
+                  ),
+                ),
+              ),
+            ],
           ),
         ),
       ),
@@ -293,6 +315,7 @@ class _AssignedActivitiesScreenState extends State<AssignedActivitiesScreen> {
         color: green,
         onRefresh: _loadAssignments,
         child: ListView(
+          physics: const AlwaysScrollableScrollPhysics(),
           padding: const EdgeInsets.fromLTRB(16, 6, 16, 16),
           children: [
             Container(

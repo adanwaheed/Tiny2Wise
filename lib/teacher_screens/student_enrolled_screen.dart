@@ -253,6 +253,7 @@ class _StudentEnolledScreenState extends State<StudentEnolledScreen> {
             color: green,
             backgroundColor: Colors.white,
             child: ListView(
+              physics: const AlwaysScrollableScrollPhysics(),
               padding: const EdgeInsets.fromLTRB(16, 10, 16, 16),
               children: [
                 Row(
@@ -479,6 +480,8 @@ class _StudentEnolledScreenState extends State<StudentEnolledScreen> {
             const SizedBox(height: 4),
             Text(
               label,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
               style: TextStyle(
                 color: color,
                 fontSize: 11.5,

@@ -349,7 +349,7 @@ class _ToddlerAvatarScreenState extends State<ToddlerAvatarScreen> {
         _bubbleText = 'شیرو سوچ رہا ہے...';
       });
 
-      final reply = await ApiService.sendToddlerMessage(
+      final reply = await ApiService.sendToddlerAvatarMessage(
         message: question,
         languageMode: 'auto',
       );
@@ -366,7 +366,7 @@ class _ToddlerAvatarScreenState extends State<ToddlerAvatarScreen> {
     } catch (e) {
       debugPrint('Gemini avatar error: $e');
 
-      final errorText = 'AI error: ${e.toString()}';
+      final errorText = 'Server connection error. Please try again.';
 
       if (!mounted) return;
 
@@ -376,7 +376,7 @@ class _ToddlerAvatarScreenState extends State<ToddlerAvatarScreen> {
         _isListening = false;
       });
 
-      await avatarKey.currentState?.speak('AI reply error');
+      await avatarKey.currentState?.speak('Server connection error. Please try again.');
     }
   }
 
@@ -463,184 +463,202 @@ class _ToddlerAvatarScreenState extends State<ToddlerAvatarScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final size = MediaQuery.of(context).size;
-
     return Scaffold(
       backgroundColor: const Color(0xFFFFEB2E),
       body: SafeArea(
-        child: Stack(
-          children: [
-            Positioned(
-              top: 0,
-              left: 0,
-              right: 0,
-              height: 170,
-              child: Container(
-                color: const Color(0xFF9D66D9),
-              ),
-            ),
+        child: LayoutBuilder(
+          builder: (context, constraints) {
+            final contentHeight = constraints.maxHeight < 720 ? 720.0 : constraints.maxHeight;
+            final contentWidth = constraints.maxWidth;
 
-            Positioned(
-              top: 96,
-              left: 0,
-              right: 0,
-              child: CustomPaint(
-                size: Size(size.width, 100),
-                painter: _WavePainter(),
-              ),
-            ),
+            return SingleChildScrollView(
+              physics: const AlwaysScrollableScrollPhysics(),
+              child: SizedBox(
+                height: contentHeight,
+                width: contentWidth,
+                child: Stack(
+                  children: [
+                    Positioned(
+                      top: 0,
+                      left: 0,
+                      right: 0,
+                      height: 170,
+                      child: Container(
+                        color: const Color(0xFF9D66D9),
+                      ),
+                    ),
 
-            Positioned(
-              top: 12,
-              left: 12,
-              child: GestureDetector(
-                onTap: () => Navigator.pop(context),
-                child: Container(
-                  height: 36,
-                  width: 36,
-                  decoration: const BoxDecoration(
-                    color: Colors.black,
-                    shape: BoxShape.circle,
-                  ),
-                  child: const Icon(
-                    Icons.arrow_back,
-                    color: Colors.white,
-                    size: 21,
-                  ),
-                ),
-              ),
-            ),
+                    Positioned(
+                      top: 96,
+                      left: 0,
+                      right: 0,
+                      child: CustomPaint(
+                        size: Size(contentWidth, 100),
+                        painter: _WavePainter(),
+                      ),
+                    ),
 
-            Positioned(
-              top: 44,
-              left: 0,
-              right: 0,
-              child: Row(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  _TopActionButton(
-                    icon: Icons.description_rounded,
-                    label: 'Mock Test',
-                    color: const Color(0xFF3193FF),
-                    onTap: () {},
-                  ),
-                  const SizedBox(width: 34),
-                  _TopActionButton(
-                    icon: Icons.star_rounded,
-                    label: 'Badges',
-                    color: const Color(0xFFFF6B1A),
-                    onTap: () {},
-                  ),
-                ],
-              ),
-            ),
-
-            Positioned(
-              top: 176,
-              left: 0,
-              right: 0,
-              bottom: 105,
-              child: Column(
-                children: [
-                  _SpeechBubble(
-                    text: _bubbleText,
-                  ),
-
-                  const SizedBox(height: 10),
-
-                  Expanded(
-                    child: Center(
-                      child: SizedBox(
-                        height: 290,
-                        width: 300,
-                        child: AvatarWebViewWidget(
-                          key: avatarKey,
-                          initialMessage: _bubbleText,
+                    Positioned(
+                      top: 12,
+                      left: 12,
+                      child: GestureDetector(
+                        onTap: () => Navigator.pop(context),
+                        child: Container(
+                          height: 36,
+                          width: 36,
+                          decoration: const BoxDecoration(
+                            color: Colors.black,
+                            shape: BoxShape.circle,
+                          ),
+                          child: const Icon(
+                            Icons.arrow_back,
+                            color: Colors.white,
+                            size: 21,
+                          ),
                         ),
                       ),
                     ),
-                  ),
 
-                  const SizedBox(height: 8),
-
-                  GestureDetector(
-                    onTap: _onMicTap,
-                    onLongPress: _showTypedQuestionDialog,
-                    child: AnimatedContainer(
-                      duration: const Duration(milliseconds: 220),
-                      height: 76,
-                      width: 76,
-                      decoration: BoxDecoration(
-                        color: _isListening
-                            ? const Color(0xFFFF6B1A)
-                            : Colors.white,
-                        shape: BoxShape.circle,
-                        border: Border.all(
-                          color: const Color(0xFFFF6B1A),
-                          width: 4,
-                        ),
-                        boxShadow: [
-                          BoxShadow(
-                            color: const Color(0xFFFF6B1A).withOpacity(0.25),
-                            blurRadius: _isListening ? 18 : 12,
-                            spreadRadius: _isListening ? 4 : 1,
-                            offset: const Offset(0, 6),
+                    Positioned(
+                      top: 44,
+                      left: 0,
+                      right: 0,
+                      child: Row(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          _TopActionButton(
+                            icon: Icons.description_rounded,
+                            label: 'Mock Test',
+                            color: const Color(0xFF3193FF),
+                            onTap: () {},
+                          ),
+                          const SizedBox(width: 34),
+                          _TopActionButton(
+                            icon: Icons.star_rounded,
+                            label: 'Badges',
+                            color: const Color(0xFFFF6B1A),
+                            onTap: () {},
                           ),
                         ],
                       ),
-                      child: _isThinking
-                          ? const SizedBox(
-                        height: 30,
-                        width: 30,
-                        child: CircularProgressIndicator(
-                          strokeWidth: 3,
-                          color: Color(0xFFFF6B1A),
-                        ),
-                      )
-                          : Icon(
-                        Icons.mic_rounded,
-                        color: _isListening
-                            ? Colors.white
-                            : const Color(0xFFFF6B1A),
-                        size: 42,
+                    ),
+
+                    Positioned(
+                      top: 176,
+                      left: 0,
+                      right: 0,
+                      bottom: 105,
+                      child: Column(
+                        children: [
+                          _SpeechBubble(
+                            text: _bubbleText,
+                          ),
+
+                          const SizedBox(height: 10),
+
+                          Expanded(
+                            child: Center(
+                              child: SizedBox(
+                                height: contentHeight < 760 ? 250 : 290,
+                                width: contentWidth < 340 ? contentWidth * 0.86 : 300,
+                                child: AvatarWebViewWidget(
+                                  key: avatarKey,
+                                  initialMessage: _bubbleText,
+                                ),
+                              ),
+                            ),
+                          ),
+
+                          const SizedBox(height: 8),
+
+                          GestureDetector(
+                            onTap: _onMicTap,
+                            onLongPress: _showTypedQuestionDialog,
+                            child: AnimatedContainer(
+                              duration: const Duration(milliseconds: 220),
+                              height: 76,
+                              width: 76,
+                              decoration: BoxDecoration(
+                                color: _isListening
+                                    ? const Color(0xFFFF6B1A)
+                                    : Colors.white,
+                                shape: BoxShape.circle,
+                                border: Border.all(
+                                  color: const Color(0xFFFF6B1A),
+                                  width: 4,
+                                ),
+                                boxShadow: [
+                                  BoxShadow(
+                                    color: const Color(0xFFFF6B1A).withOpacity(0.25),
+                                    blurRadius: _isListening ? 18 : 12,
+                                    spreadRadius: _isListening ? 4 : 1,
+                                    offset: const Offset(0, 6),
+                                  ),
+                                ],
+                              ),
+                              child: _isThinking
+                                  ? const SizedBox(
+                                height: 30,
+                                width: 30,
+                                child: CircularProgressIndicator(
+                                  strokeWidth: 3,
+                                  color: Color(0xFFFF6B1A),
+                                ),
+                              )
+                                  : Icon(
+                                Icons.mic_rounded,
+                                color: _isListening
+                                    ? Colors.white
+                                    : const Color(0xFFFF6B1A),
+                                size: 42,
+                              ),
+                            ),
+                          ),
+                        ],
                       ),
                     ),
-                  ),
-                ],
-              ),
-            ),
 
-            Positioned(
-              left: 0,
-              right: 0,
-              bottom: 16,
-              child: Row(
-                mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-                children: const [
-                  _BottomItem(
-                    icon: Icons.sports_esports_rounded,
-                    label: 'Games',
-                    color: Color(0xFF2865F0),
-                  ),
-                  _BottomItem(
-                    icon: Icons.extension_rounded,
-                    label: 'Puzzles',
-                    color: Color(0xFF49D83F),
-                  ),
-                  _BottomItem(
-                    icon: Icons.menu_book_rounded,
-                    label: 'Story Time',
-                    color: Color(0xFF8A6D20),
-                  ),
-                  _BottomItem(
-                    icon: Icons.chat_bubble_outline_rounded,
-                    label: 'Chatbot',
-                    color: Color(0xFFFF5A2A),
-                  ),
-                ],
+                    Positioned(
+                      left: 0,
+                      right: 0,
+                      bottom: 16,
+                      child: SingleChildScrollView(
+                        scrollDirection: Axis.horizontal,
+                        child: Row(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          children: const [
+                            _BottomItem(
+                              icon: Icons.sports_esports_rounded,
+                              label: 'Games',
+                              color: Color(0xFF2865F0),
+                            ),
+                            SizedBox(width: 18),
+                            _BottomItem(
+                              icon: Icons.extension_rounded,
+                              label: 'Puzzles',
+                              color: Color(0xFF49D83F),
+                            ),
+                            SizedBox(width: 18),
+                            _BottomItem(
+                              icon: Icons.menu_book_rounded,
+                              label: 'Story Time',
+                              color: Color(0xFF8A6D20),
+                            ),
+                            SizedBox(width: 18),
+                            _BottomItem(
+                              icon: Icons.chat_bubble_outline_rounded,
+                              label: 'Chatbot',
+                              color: Color(0xFFFF5A2A),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
               ),
-            ),
-          ],
+            );
+          },
         ),
       ),
     );
@@ -664,8 +682,8 @@ class _SpeechBubble extends StatelessWidget {
       children: [
         Container(
           constraints: const BoxConstraints(
-            maxWidth: 285,
-            minHeight: 52,
+            maxWidth: 330,
+            minHeight: 56,
           ),
           padding: const EdgeInsets.symmetric(
             horizontal: 18,
@@ -690,11 +708,10 @@ class _SpeechBubble extends StatelessWidget {
             text,
             textDirection: isUrdu ? TextDirection.rtl : TextDirection.ltr,
             textAlign: TextAlign.center,
-            maxLines: 4,
-            overflow: TextOverflow.ellipsis,
+            softWrap: true,
             style: isUrdu
                 ? GoogleFonts.notoNaskhArabic(
-              fontSize: 16,
+              fontSize: 15,
               height: 1.45,
               color: const Color(0xFF1F2A2E),
               fontWeight: FontWeight.w900,

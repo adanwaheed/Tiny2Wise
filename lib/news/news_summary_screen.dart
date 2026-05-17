@@ -33,10 +33,13 @@ class _NewsSummaryScreenState extends State<NewsSummaryScreen> {
   bool _loading = true;
   bool _saving = false;
   bool _isSpeaking = false;
+  bool _ttsReady = false;
+  bool _ttsInitializing = false;
   double _progress = 0;
   double _speechRate = 1.0;
   int _estimatedTotalSeconds = 0;
   String _activeIdentifier = '';
+  String _ttsLanguage = 'ur-PK';
 
   @override
   void initState() {
@@ -77,11 +80,53 @@ class _NewsSummaryScreenState extends State<NewsSummaryScreen> {
     );
   }
 
+  bool _ttsResultOk(dynamic result) {
+    final value = result?.toString().toLowerCase().trim() ?? '';
+    return result == true || result == 1 || value == '1' || value == 'true' || value == 'success';
+  }
+
+  Future<String> _pickBestTtsLanguage() async {
+    const preferred = ['ur-PK', 'ur-IN', 'hi-IN', 'en-US'];
+
+    try {
+      final languages = await _tts.getLanguages;
+      if (languages is List) {
+        final available = languages
+            .map((e) => e.toString())
+            .where((e) => e.trim().isNotEmpty)
+            .toList();
+        final availableLower = available.map((e) => e.toLowerCase()).toList();
+
+        for (final language in preferred) {
+          final index = availableLower.indexOf(language.toLowerCase());
+          if (index >= 0) return available[index];
+        }
+
+        for (final prefix in ['ur', 'hi', 'en']) {
+          final index = availableLower.indexWhere((e) => e.startsWith(prefix));
+          if (index >= 0) return available[index];
+        }
+      }
+    } catch (_) {}
+
+    for (final language in preferred) {
+      try {
+        final available = await _tts.isLanguageAvailable(language);
+        if (_ttsResultOk(available)) return language;
+      } catch (_) {}
+    }
+
+    return 'ur-PK';
+  }
+
   Future<void> _setupTts() async {
-    await _tts.setLanguage('ur-PK');
-    await _tts.setPitch(1.0);
-    await _applySpeechRate();
-    await _tts.awaitSpeakCompletion(true);
+    if (_ttsInitializing) {
+      while (_ttsInitializing) {
+        await Future.delayed(const Duration(milliseconds: 50));
+      }
+      return;
+    }
+    _ttsInitializing = true;
 
     _tts.setStartHandler(() {
       if (!mounted) return;
@@ -116,6 +161,27 @@ class _NewsSummaryScreenState extends State<NewsSummaryScreen> {
         if (_progress > 1) _progress = 1;
       });
     });
+
+    try {
+      await _tts.awaitSpeakCompletion(false);
+      await _tts.setVolume(1.0);
+      await _tts.setPitch(1.0);
+      _ttsLanguage = await _pickBestTtsLanguage();
+      await _tts.setLanguage(_ttsLanguage);
+      await _applySpeechRate();
+
+      try {
+        await _tts.setQueueMode(1);
+      } catch (_) {}
+
+      if (!mounted) return;
+      setState(() => _ttsReady = true);
+    } catch (_) {
+      if (!mounted) return;
+      setState(() => _ttsReady = false);
+    } finally {
+      _ttsInitializing = false;
+    }
   }
 
   Future<void> _applySpeechRate() async {
@@ -294,9 +360,37 @@ class _NewsSummaryScreenState extends State<NewsSummaryScreen> {
       return;
     }
 
-    _estimatedTotalSeconds = _estimateSeconds(text);
-    setState(() => _progress = 0);
-    await _tts.speak(text);
+    if (!_ttsReady) {
+      await _setupTts();
+    }
+
+    try {
+      await _tts.setLanguage(_ttsLanguage);
+      await _applySpeechRate();
+      _estimatedTotalSeconds = _estimateSeconds(text);
+      if (!mounted) return;
+      setState(() {
+        _progress = 0;
+        _isSpeaking = true;
+      });
+
+      final result = await _tts.speak(text);
+      if (!_ttsResultOk(result)) {
+        if (!mounted) return;
+        setState(() => _isSpeaking = false);
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Voice is not available. Please install/update Google Text-to-Speech Urdu voice.'),
+          ),
+        );
+      }
+    } catch (e) {
+      if (!mounted) return;
+      setState(() => _isSpeaking = false);
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Voice error: ${e.toString()}')),
+      );
+    }
   }
 
   Future<void> _toggleSave() async {
