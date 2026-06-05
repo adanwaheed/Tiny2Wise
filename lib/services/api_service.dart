@@ -122,6 +122,32 @@ class ApiService {
 
   // -------------------- ME (PROFILE) --------------------
 
+  static const String _profilePhotoCacheKey = 'cached_profile_photo_bytes';
+
+  static Future<void> saveCachedProfilePhotoBytes(Uint8List bytes) async {
+    if (bytes.isEmpty) return;
+    final sp = await SharedPreferences.getInstance();
+    await sp.setString(_profilePhotoCacheKey, base64Encode(bytes));
+  }
+
+  static Future<Uint8List?> getCachedProfilePhotoBytes() async {
+    final sp = await SharedPreferences.getInstance();
+    final encoded = sp.getString(_profilePhotoCacheKey);
+    if (encoded == null || encoded.isEmpty) return null;
+    try {
+      final bytes = base64Decode(encoded);
+      return bytes.isEmpty ? null : Uint8List.fromList(bytes);
+    } catch (_) {
+      await sp.remove(_profilePhotoCacheKey);
+      return null;
+    }
+  }
+
+  static Future<void> clearCachedProfilePhotoBytes() async {
+    final sp = await SharedPreferences.getInstance();
+    await sp.remove(_profilePhotoCacheKey);
+  }
+
   static Future<Map<String, dynamic>> getMe() async {
     final headers = await _authHeaders();
 
@@ -139,14 +165,25 @@ class ApiService {
     return data;
   }
 
-  static Future<Uint8List?> getMyProfilePhotoBytes() async {
+  static Future<Uint8List?> getMyProfilePhotoBytes({int? cacheBust}) async {
     final token = await getToken();
-    if (token == null) throw 'Token missing. Please login again.';
+    if (token == null || token.isEmpty) {
+      throw 'Token missing. Please login again.';
+    }
+
+    final uri = cacheBust == null
+        ? Uri.parse('$baseUrl/api/me/photo')
+        : Uri.parse('$baseUrl/api/me/photo?b=$cacheBust');
 
     final res = await http
         .get(
-      Uri.parse('$baseUrl/api/me/photo'),
-      headers: {'Authorization': 'Bearer $token'},
+      uri,
+      headers: {
+        'Authorization': 'Bearer $token',
+        'Accept': 'image/*',
+        'Cache-Control': 'no-cache',
+        'Pragma': 'no-cache',
+      },
     )
         .timeout(const Duration(seconds: 25));
 
@@ -298,6 +335,98 @@ class ApiService {
   }
 
 
+  // -------------------- TODDLER ACTIVITY PROGRESS --------------------
+
+  static Future<Map<String, dynamic>> getToddlerActivityProgress({
+    required String toddlerId,
+  }) async {
+    final headers = await _authHeaders();
+    final cacheBuster = DateTime.now().millisecondsSinceEpoch;
+
+    final res = await http
+        .get(
+      Uri.parse('$baseUrl/api/toddlers/${toddlerId.trim()}/activity-progress?t=$cacheBuster'),
+      headers: {
+        ...headers,
+        'Cache-Control': 'no-cache',
+        'Pragma': 'no-cache',
+      },
+    )
+        .timeout(const Duration(seconds: 25));
+
+    final data = _safeJson(res.body);
+    if (res.statusCode != 200) {
+      throw (data['message'] ?? 'Failed to load toddler activity progress').toString();
+    }
+    return data;
+  }
+
+  static Future<Map<String, dynamic>> getActiveToddlerActivityProgress() async {
+    final headers = await _authHeaders();
+    final cacheBuster = DateTime.now().millisecondsSinceEpoch;
+
+    final res = await http
+        .get(
+      Uri.parse('$baseUrl/api/toddlers/active/activity-progress?t=$cacheBuster'),
+      headers: {
+        ...headers,
+        'Cache-Control': 'no-cache',
+        'Pragma': 'no-cache',
+      },
+    )
+        .timeout(const Duration(seconds: 25));
+
+    final data = _safeJson(res.body);
+    if (res.statusCode != 200) {
+      throw (data['message'] ?? 'Failed to load active toddler activity progress').toString();
+    }
+    return data;
+  }
+
+  static Future<Map<String, dynamic>> recordToddlerActivityProgress({
+    required String toddlerId,
+    required String activityType,
+    String title = '',
+    int score = 0,
+    int total = 0,
+    int correct = 0,
+    int completed = 0,
+    String sourceId = '',
+    String note = '',
+    Map<String, dynamic> metadata = const {},
+  }) async {
+    final headers = await _authHeaders();
+
+    final res = await http
+        .post(
+      Uri.parse('$baseUrl/api/toddlers/${toddlerId.trim()}/activity-progress'),
+      headers: {
+        ...headers,
+        'Content-Type': 'application/json',
+      },
+      body: jsonEncode({
+        'activityType': activityType.trim(),
+        'title': title.trim(),
+        'score': score,
+        'percentage': score,
+        'total': total,
+        'correct': correct,
+        'completed': completed,
+        'sourceId': sourceId.trim(),
+        'note': note.trim(),
+        'metadata': metadata,
+      }),
+    )
+        .timeout(const Duration(seconds: 25));
+
+    final data = _safeJson(res.body);
+    if (res.statusCode != 200) {
+      throw (data['message'] ?? 'Failed to save toddler activity progress').toString();
+    }
+    return data;
+  }
+
+
   static Future<Map<String, dynamic>?> getActiveToddler() async {
     final toddlers = await getToddlers();
     if (toddlers.isEmpty) return null;
@@ -363,11 +492,16 @@ class ApiService {
       body: jsonEncode({
         'badgeKey': badgeKey.trim(),
         'source': source.trim(),
+        'sourceActivity': source.trim(),
+        'activityType': source.trim(),
         'score': score,
+        'percentage': score,
         'total': total,
         'correct': correct,
+        'completed': correct > 0 ? correct : total,
         'goalText': goalText.trim(),
         'details': details,
+        'metadata': details,
       }),
     )
         .timeout(const Duration(seconds: 25));
@@ -376,6 +510,15 @@ class ApiService {
     if (res.statusCode != 200) {
       throw (data['message'] ?? 'Failed to award badge').toString();
     }
+
+    final newBadges = data['newBadges'];
+    if (newBadges is List && newBadges.isNotEmpty) {
+      data['newlyUnlocked'] = true;
+      data['badge'] = newBadges.first;
+    } else {
+      data['newlyUnlocked'] = false;
+    }
+
     return data;
   }
 

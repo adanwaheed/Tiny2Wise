@@ -1,4 +1,5 @@
 import 'dart:io';
+import 'dart:typed_data';
 
 import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
@@ -34,11 +35,9 @@ class _TeacherSettingScreenState extends State<TeacherSettingScreen> {
   bool contributeSpeech = true;
   bool enableFaceId = true;
 
-  // ✅ token cache for authenticated images
-  String? _token;
-
-  // ✅ cache-bust for profile image (URL stays same /api/me/photo)
+  // ✅ cache-bust for profile image (/api/me/photo returns protected bytes)
   int _photoBust = 0;
+  Uint8List? _profileBytes;
 
   @override
   void initState() {
@@ -47,7 +46,6 @@ class _TeacherSettingScreenState extends State<TeacherSettingScreen> {
   }
 
   Future<void> _init() async {
-    _token = await ApiService.getToken();
     await _loadMe();
   }
 
@@ -64,24 +62,61 @@ class _TeacherSettingScreenState extends State<TeacherSettingScreen> {
     );
   }
 
-  Future<void> _loadMe() async {
-    setState(() => loading = true);
+  Future<void> _loadMe({bool showLoader = true}) async {
+    if (showLoader && mounted) setState(() => loading = true);
     try {
       final data = await ApiService.getMe();
-      setState(() => me = data["user"] as Map<String, dynamic>?);
+      final user = data["user"] as Map<String, dynamic>?;
+      final hasPhoto = (user?["hasPhoto"] ?? false) == true;
+
+      // Always try to load protected bytes directly.
+      // Some devices update /api/me before the hasPhoto flag refreshes, so do not
+      // depend only on hasPhoto. Also keep a local cache so the uploaded image
+      // remains visible immediately and after refresh.
+      Uint8List? bytes = _profileBytes;
+      bytes ??= await ApiService.getCachedProfilePhotoBytes();
+
+      try {
+        final serverBytes = await ApiService.getMyProfilePhotoBytes(cacheBust: _photoBust);
+        if (serverBytes != null && serverBytes.isNotEmpty) {
+          bytes = serverBytes;
+          await ApiService.saveCachedProfilePhotoBytes(serverBytes);
+        }
+      } catch (_) {
+        // Keep current/cached photo if the protected image request fails once.
+      }
+
+      if (!mounted) return;
+      setState(() {
+        me = {
+          ...?user,
+          'hasPhoto': hasPhoto || ((bytes?.isNotEmpty ?? false)),
+        };
+        _profileBytes = bytes;
+      });
     } catch (e) {
       _toast("$e");
     } finally {
-      if (mounted) setState(() => loading = false);
+      if (mounted && showLoader) setState(() => loading = false);
     }
   }
 
   String get _name => (me?["name"] ?? "Teacher").toString();
   String get _email => (me?["email"] ?? "").toString();
-  String get _photoUrl => (me?["photoUrl"] ?? "").toString();
   bool get _hasPhoto => (me?["hasPhoto"] ?? false) == true;
 
-  // ✅ FIXED: upload + refresh + cache-bust
+  Widget _teacherFallbackAvatar() {
+    return Container(
+      color: const Color(0xFFF3F4F6),
+      child: const Icon(
+        Icons.person_rounded,
+        size: 38,
+        color: Color(0xFF9CA3AF),
+      ),
+    );
+  }
+
+  // ✅ FIXED: upload + refresh protected image bytes
   Future<void> _pickAndUploadImage() async {
     if (uploading) return;
 
@@ -105,17 +140,44 @@ class _TeacherSettingScreenState extends State<TeacherSettingScreen> {
 
       setState(() => uploading = true);
 
+      final localBytes = await file.readAsBytes();
+      await ApiService.saveCachedProfilePhotoBytes(localBytes);
+
+      if (!mounted) return;
+      setState(() {
+        _photoBust = DateTime.now().millisecondsSinceEpoch;
+        _profileBytes = localBytes;
+        me = {
+          ...?me,
+          'hasPhoto': true,
+        };
+      });
+
       await ApiService.uploadMyProfilePhoto(photoFile: file);
 
-      _token = await ApiService.getToken();
-      await _loadMe();
-
-      // ✅ force re-render with a new URL (cache-bust)
-      setState(() => _photoBust = DateTime.now().millisecondsSinceEpoch);
-
-      // ✅ also clear cache
+      _photoBust = DateTime.now().millisecondsSinceEpoch;
       imageCache.clear();
       imageCache.clearLiveImages();
+
+      try {
+        final serverBytes = await ApiService.getMyProfilePhotoBytes(cacheBust: _photoBust);
+        if (serverBytes != null && serverBytes.isNotEmpty) {
+          await ApiService.saveCachedProfilePhotoBytes(serverBytes);
+          if (mounted) {
+            setState(() {
+              _profileBytes = serverBytes;
+              me = {
+                ...?me,
+                'hasPhoto': true,
+              };
+            });
+          }
+        }
+      } catch (_) {
+        // Local selected image is already visible.
+      }
+
+      await _loadMe(showLoader: false);
 
       _toast("Profile photo updated");
     } catch (e) {
@@ -238,14 +300,6 @@ class _TeacherSettingScreenState extends State<TeacherSettingScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final authHeaders = (_token == null || _token!.isEmpty)
-        ? const <String, String>{}
-        : <String, String>{"Authorization": "Bearer $_token"};
-
-    final profileImageUrl = _photoUrl.trim().isEmpty
-        ? ""
-        : ApiService.absoluteUrl("$_photoUrl?b=$_photoBust");
-
     return Scaffold(
       body: Container(
         decoration: const BoxDecoration(
@@ -287,24 +341,15 @@ class _TeacherSettingScreenState extends State<TeacherSettingScreen> {
                                 color: const Color(0xFFF3F4F6),
                               ),
                               child: ClipOval(
-                                child: (_hasPhoto && profileImageUrl.isNotEmpty)
-                                    ? Image.network(
-                                  profileImageUrl,
+                                child: (_profileBytes != null && _profileBytes!.isNotEmpty)
+                                    ? Image.memory(
+                                  _profileBytes!,
+                                  key: ValueKey(_photoBust),
                                   fit: BoxFit.cover,
-                                  headers: authHeaders,
-                                  errorBuilder: (_, __, ___) => Container(color: const Color(0xFFF3F4F6)),
-                                  loadingBuilder: (context, child, progress) {
-                                    if (progress == null) return child;
-                                    return const Center(
-                                      child: SizedBox(
-                                        width: 18,
-                                        height: 18,
-                                        child: CircularProgressIndicator(strokeWidth: 2),
-                                      ),
-                                    );
-                                  },
+                                  gaplessPlayback: true,
+                                  errorBuilder: (_, __, ___) => _teacherFallbackAvatar(),
                                 )
-                                    : Container(color: const Color(0xFFF3F4F6)),
+                                    : _teacherFallbackAvatar(),
                               ),
                             ),
                             Positioned(

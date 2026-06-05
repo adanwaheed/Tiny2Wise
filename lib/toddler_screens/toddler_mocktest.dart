@@ -348,9 +348,40 @@ class _ToddlerMockTestScreenState extends State<ToddlerMockTestScreen> {
       };
     }
 
+    await _saveMockProgressIfPossible();
     await _awardMockTestBadgeIfGood();
 
     if (mounted) setState(() => _saving = false);
+  }
+
+  Future<void> _saveMockProgressIfPossible() async {
+    final toddlerId = _resolvedToddlerId?.trim() ?? '';
+    if (toddlerId.isEmpty || _savedResult == null) return;
+
+    final percentage = _toInt(_savedResult?['percentage']);
+    final total = _toInt(_savedResult?['totalQuestions']);
+    final correct = _toInt(_savedResult?['correctCount']);
+    final resultId = (_savedResult?['_id'] ?? _savedResult?['id'] ?? '').toString();
+
+    try {
+      await ApiService.recordToddlerActivityProgress(
+        toddlerId: toddlerId,
+        activityType: 'mock_test',
+        title: 'Mock Test Completed',
+        score: percentage,
+        total: total,
+        correct: correct,
+        completed: total,
+        sourceId: resultId.isNotEmpty ? resultId : 'mock_${DateTime.now().millisecondsSinceEpoch}',
+        note: 'Mock test score $percentage% ($correct/$total correct).',
+        metadata: {
+          'resultId': resultId,
+          'needsPracticeCount': (_savedResult?['needsPractice'] is List) ? (_savedResult?['needsPractice'] as List).length : 0,
+        },
+      );
+    } catch (_) {
+      // Server submit already records progress. This is only a safe fallback.
+    }
   }
 
   Future<void> _awardMockTestBadgeIfGood() async {

@@ -216,6 +216,7 @@ class _ToddlerGamePlayScreenState extends State<ToddlerGamePlayScreen> {
   bool _answerHandled = false;
   bool _finished = false;
   bool _badgeAwardChecked = false;
+  bool _progressSaved = false;
 
   String _selectedLocaleId = '';
   String _heardText = '';
@@ -385,6 +386,7 @@ class _ToddlerGamePlayScreenState extends State<ToddlerGamePlayScreen> {
         _finished = true;
         _status = 'Game complete!';
       });
+      unawaited(_saveGameProgress());
       unawaited(_awardBadgeIfGoodProgress());
       return;
     }
@@ -395,6 +397,41 @@ class _ToddlerGamePlayScreenState extends State<ToddlerGamePlayScreen> {
       _answerHandled = false;
       _status = 'Tap the mic and speak clearly.';
     });
+  }
+
+  Future<void> _saveGameProgress() async {
+    if (_progressSaved) return;
+    _progressSaved = true;
+
+    final total = widget.game.items.length;
+    final percent = total == 0 ? 0 : ((_correct / total) * 100).round();
+
+    try {
+      final toddler = await ApiService.getActiveToddler();
+      if (toddler == null) return;
+
+      final toddlerId = (toddler['_id'] ?? toddler['id'] ?? '').toString().trim();
+      if (toddlerId.isEmpty) return;
+
+      await ApiService.recordToddlerActivityProgress(
+        toddlerId: toddlerId,
+        activityType: 'games',
+        title: '${widget.game.title} Completed',
+        score: percent,
+        total: total,
+        correct: _correct,
+        completed: total,
+        sourceId: 'game_${widget.game.key}_${DateTime.now().millisecondsSinceEpoch}',
+        note: 'Completed ${widget.game.title} with $percent% score.',
+        metadata: {
+          'gameKey': widget.game.key,
+          'gameTitle': widget.game.title,
+          'results': _results,
+        },
+      );
+    } catch (_) {
+      // Progress saving must never block the game screen.
+    }
   }
 
   Future<void> _awardBadgeIfGoodProgress() async {
@@ -841,6 +878,7 @@ class _ToddlerGamePlayScreenState extends State<ToddlerGamePlayScreen> {
                             _results.clear();
                             _finished = false;
                             _badgeAwardChecked = false;
+                            _progressSaved = false;
                             _heardText = '';
                             _status = 'Tap the mic and speak clearly.';
                           });

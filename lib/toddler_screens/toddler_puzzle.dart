@@ -264,6 +264,7 @@ class _ToddlerPuzzlePlayScreenState extends State<ToddlerPuzzlePlayScreen> {
   bool _isListening = false;
   bool _speechAnswerHandled = false;
   bool _badgeAwardChecked = false;
+  bool _progressSaved = false;
   ToddlerPuzzlePiece? _speechPiece;
   String _speechStatus = 'Finish a match, then say the word clearly.';
   String _recognizedWords = '';
@@ -550,8 +551,46 @@ class _ToddlerPuzzlePlayScreenState extends State<ToddlerPuzzlePlayScreen> {
       _recognizedWords = '';
       _speechAnswerHandled = false;
       _badgeAwardChecked = false;
+      _progressSaved = false;
       _speechStatus = 'Finish a match, then say the word clearly.';
     });
+  }
+
+  Future<void> _savePuzzleProgressIfComplete() async {
+    if (_progressSaved) return;
+    final allMatched = _placedBySlot.length == widget.game.slots.length;
+    final allSpoken = _spokenPieceIds.length == widget.game.pieces.length;
+    if (!allMatched || !allSpoken) return;
+
+    _progressSaved = true;
+
+    try {
+      final toddler = await ApiService.getActiveToddler();
+      if (toddler == null) return;
+
+      final toddlerId = (toddler['_id'] ?? toddler['id'] ?? '').toString().trim();
+      if (toddlerId.isEmpty) return;
+
+      final total = widget.game.pieces.length;
+      await ApiService.recordToddlerActivityProgress(
+        toddlerId: toddlerId,
+        activityType: 'puzzles',
+        title: '${widget.game.title} Solved',
+        score: 100,
+        total: total,
+        correct: total,
+        completed: total,
+        sourceId: 'puzzle_${widget.game.key}_${DateTime.now().millisecondsSinceEpoch}',
+        note: 'Solved ${widget.game.title} and spoke all words clearly.',
+        metadata: {
+          'puzzleKey': widget.game.key,
+          'puzzleTitle': widget.game.title,
+          'matchedPieces': total,
+        },
+      );
+    } catch (_) {
+      // Progress saving must never interrupt puzzle play.
+    }
   }
 
   Future<void> _awardPuzzleBadgeIfComplete() async {
@@ -619,9 +658,11 @@ class _ToddlerPuzzlePlayScreenState extends State<ToddlerPuzzlePlayScreen> {
     final completedSpeech = _spokenPieceIds.length;
     final allDone = completedMatches == game.slots.length && completedSpeech == game.pieces.length;
 
-    if (allDone && !_badgeAwardChecked) {
+    if (allDone && (!_progressSaved || !_badgeAwardChecked)) {
       WidgetsBinding.instance.addPostFrameCallback((_) {
-        if (mounted) unawaited(_awardPuzzleBadgeIfComplete());
+        if (!mounted) return;
+        unawaited(_savePuzzleProgressIfComplete());
+        unawaited(_awardPuzzleBadgeIfComplete());
       });
     }
 

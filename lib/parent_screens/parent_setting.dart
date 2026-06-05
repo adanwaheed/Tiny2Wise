@@ -48,6 +48,7 @@ class _ParentSettingScreenState extends State<ParentSettingScreen> {
   String parentEmail = "";
   Uint8List? _profileBytes;
   bool _hasPhoto = false;
+  int _photoBust = 0;
 
   @override
   void initState() {
@@ -55,9 +56,11 @@ class _ParentSettingScreenState extends State<ParentSettingScreen> {
     _loadProfile();
   }
 
-  Future<void> _loadProfile() async {
+  Future<void> _loadProfile({bool showLoader = true}) async {
     try {
-      setState(() => _loading = true);
+      if (showLoader && mounted) {
+        setState(() => _loading = true);
+      }
 
       final me = await ApiService.getMe();
       final user = (me["user"] as Map<String, dynamic>? ?? {});
@@ -66,29 +69,37 @@ class _ParentSettingScreenState extends State<ParentSettingScreen> {
       final email = (user["email"] ?? "").toString();
       final hasPhoto = user["hasPhoto"] == true;
 
-      Uint8List? bytes;
-      if (hasPhoto) {
-        bytes = await ApiService.getMyProfilePhotoBytes();
+      // Always try to load protected bytes directly.
+      // Some devices update /api/me before the hasPhoto flag refreshes, so do not
+      // depend only on hasPhoto. Also keep a local cache so the uploaded image
+      // remains visible immediately and after refresh.
+      Uint8List? bytes = _profileBytes;
+      bytes ??= await ApiService.getCachedProfilePhotoBytes();
+
+      try {
+        final serverBytes = await ApiService.getMyProfilePhotoBytes(cacheBust: _photoBust);
+        if (serverBytes != null && serverBytes.isNotEmpty) {
+          bytes = serverBytes;
+          await ApiService.saveCachedProfilePhotoBytes(serverBytes);
+        }
+      } catch (_) {
+        // Keep current/cached photo if the protected image request fails once.
       }
 
       if (!mounted) return;
       setState(() {
         parentName = name;
         parentEmail = email;
-        _hasPhoto = hasPhoto;
+        _hasPhoto = hasPhoto || ((bytes?.isNotEmpty ?? false));
         _profileBytes = bytes;
       });
     } catch (e) {
       if (!mounted) return;
-      setState(() {
-        _profileBytes = null;
-        _hasPhoto = false;
-      });
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text(e.toString())),
       );
     } finally {
-      if (mounted) {
+      if (mounted && showLoader) {
         setState(() => _loading = false);
       }
     }
@@ -99,7 +110,9 @@ class _ParentSettingScreenState extends State<ParentSettingScreen> {
       final picker = ImagePicker();
       final picked = await picker.pickImage(
         source: ImageSource.gallery,
-        imageQuality: 85,
+        imageQuality: 70,
+        maxWidth: 900,
+        maxHeight: 900,
       );
 
       if (picked == null) return;
@@ -108,17 +121,38 @@ class _ParentSettingScreenState extends State<ParentSettingScreen> {
 
       final file = File(picked.path);
 
-      await ApiService.uploadMyProfilePhoto(photoFile: file);
-
       final localBytes = await file.readAsBytes();
+      await ApiService.saveCachedProfilePhotoBytes(localBytes);
 
       if (!mounted) return;
       setState(() {
+        _photoBust = DateTime.now().millisecondsSinceEpoch;
         _profileBytes = localBytes;
         _hasPhoto = true;
       });
 
-      await _loadProfile();
+      await ApiService.uploadMyProfilePhoto(photoFile: file);
+
+      _photoBust = DateTime.now().millisecondsSinceEpoch;
+      imageCache.clear();
+      imageCache.clearLiveImages();
+
+      try {
+        final serverBytes = await ApiService.getMyProfilePhotoBytes(cacheBust: _photoBust);
+        if (serverBytes != null && serverBytes.isNotEmpty) {
+          await ApiService.saveCachedProfilePhotoBytes(serverBytes);
+          if (mounted) {
+            setState(() {
+              _profileBytes = serverBytes;
+              _hasPhoto = true;
+            });
+          }
+        }
+      } catch (_) {
+        // Local selected image is already visible.
+      }
+
+      await _loadProfile(showLoader: false);
 
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
@@ -326,7 +360,9 @@ class _ParentSettingScreenState extends State<ParentSettingScreen> {
               child: _profileBytes != null
                   ? Image.memory(
                 _profileBytes!,
+                key: ValueKey(_photoBust),
                 fit: BoxFit.cover,
+                gaplessPlayback: true,
                 errorBuilder: (_, __, ___) => _fallbackAvatar(),
               )
                   : _fallbackAvatar(),

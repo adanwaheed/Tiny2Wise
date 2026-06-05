@@ -509,6 +509,22 @@ class _ToddlerAvatarScreenState extends State<ToddlerAvatarScreen> {
       final toddlerId = (toddler['_id'] ?? toddler['id'] ?? '').toString().trim();
       if (toddlerId.isEmpty) return;
 
+      await ApiService.recordToddlerActivityProgress(
+        toddlerId: toddlerId,
+        activityType: 'avatar',
+        title: 'Talked With Noor',
+        score: 100,
+        total: 1,
+        correct: 1,
+        completed: 1,
+        sourceId: 'avatar_${DateTime.now().millisecondsSinceEpoch}',
+        note: 'Answered Noor clearly during avatar practice.',
+        metadata: {
+          'childSpeech': question,
+          'avatarReply': reply,
+        },
+      );
+
       final data = await ApiService.awardToddlerBadge(
         toddlerId: toddlerId,
         badgeKey: 'avatar_good_listener',

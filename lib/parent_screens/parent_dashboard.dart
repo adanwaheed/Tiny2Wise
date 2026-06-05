@@ -12,6 +12,7 @@ import 'parent_setting.dart';
 import 'parent_story_telling.dart';
 import 'parent_assigned_activities.dart';
 import 'parent_toddler_activity.dart';
+import 'parent_toddler_progress.dart';
 
 class ParentDashboardScreen extends StatefulWidget {
   final String parentName;
@@ -125,6 +126,27 @@ class _ParentDashboardScreenState extends State<ParentDashboardScreen>
     });
   }
 
+  void _openToddlerProgress() {
+    if (activeToddlerId == null) {
+      _toast("Select a child first");
+      return;
+    }
+
+    Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (_) => ParentToddlerProgressScreen(
+          toddlerId: activeToddlerId!,
+          toddlerName: _activeName(),
+        ),
+      ),
+    ).then((_) {
+      if (activeToddlerId != null) {
+        _loadProgress(activeToddlerId!);
+      }
+    });
+  }
+
   void _openMockTest() {
     if (activeToddlerId == null) {
       _toast("Select a child first");
@@ -207,14 +229,24 @@ class _ParentDashboardScreenState extends State<ParentDashboardScreen>
   Future<void> _loadProgress(String toddlerId) async {
     setState(() => progressLoading = true);
     try {
-      final p = await ApiService.getToddlerProgress(toddlerId);
-      speechAccuracy = (p["speechAccuracy"] ?? 0).toDouble();
-      progressNote = (p["note"] ?? "").toString();
+      final p = await ApiService.getToddlerActivityProgress(toddlerId: toddlerId);
+      final overview = Map<String, dynamic>.from(p["overview"] as Map? ?? {});
+      speechAccuracy = (overview["overallProgress"] ?? overview["speechAccuracy"] ?? 0).toDouble();
+      progressNote = (overview["note"] ?? "").toString();
       if (progressNote.trim().isEmpty) {
         progressNote = "Keep going - small steps, big progress!";
       }
-    } catch (e) {
-      _toast("Progress error: $e");
+    } catch (_) {
+      try {
+        final p = await ApiService.getToddlerProgress(toddlerId);
+        speechAccuracy = (p["speechAccuracy"] ?? 0).toDouble();
+        progressNote = (p["note"] ?? "").toString();
+        if (progressNote.trim().isEmpty) {
+          progressNote = "Keep going - small steps, big progress!";
+        }
+      } catch (e) {
+        _toast("Progress error: $e");
+      }
     } finally {
       if (mounted) setState(() => progressLoading = false);
     }
@@ -494,7 +526,7 @@ class _ParentDashboardScreenState extends State<ParentDashboardScreen>
                           label: "See Analytics",
                           onTap: () {
                             HapticFeedback.selectionClick();
-                            _toast("Analytics");
+                            _openToddlerProgress();
                           },
                         ),
                       ],
@@ -506,7 +538,7 @@ class _ParentDashboardScreenState extends State<ParentDashboardScreen>
                     _PressableCard(
                       onTap: () {
                         HapticFeedback.selectionClick();
-                        _toast("Open progress details");
+                        _openToddlerProgress();
                       },
                       child: Container(
                         width: double.infinity,
@@ -593,7 +625,7 @@ class _ParentDashboardScreenState extends State<ParentDashboardScreen>
                                           icon: Icons.arrow_forward_rounded,
                                           onTap: () {
                                             HapticFeedback.mediumImpact();
-                                            _toast("View Details");
+                                            _openToddlerProgress();
                                           },
                                         ),
                                       ),

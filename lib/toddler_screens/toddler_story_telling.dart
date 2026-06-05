@@ -29,6 +29,7 @@ class _ToddlerStoryTellingScreenState extends State<ToddlerStoryTellingScreen>
   String? _errorText;
 
   Map<String, dynamic>? _activeToddler;
+  Map<String, dynamic>? _currentlyPlayingStory;
   List<Map<String, dynamic>> _stories = [];
 
   @override
@@ -38,8 +39,15 @@ class _ToddlerStoryTellingScreenState extends State<ToddlerStoryTellingScreen>
     _loadStories();
     _startAutoRefresh();
     _player.onPlayerComplete.listen((_) {
+      final completedStory = _currentlyPlayingStory;
+      if (completedStory != null) {
+        unawaited(_recordStoryProgress(completedStory));
+      }
       if (!mounted) return;
-      setState(() => _currentlyPlayingId = null);
+      setState(() {
+        _currentlyPlayingId = null;
+        _currentlyPlayingStory = null;
+      });
     });
   }
 
@@ -186,7 +194,12 @@ class _ToddlerStoryTellingScreenState extends State<ToddlerStoryTellingScreen>
 
     if (_currentlyPlayingId == storyId) {
       await _player.stop();
-      if (mounted) setState(() => _currentlyPlayingId = null);
+      if (mounted) {
+        setState(() {
+          _currentlyPlayingId = null;
+          _currentlyPlayingStory = null;
+        });
+      }
       return;
     }
 
@@ -208,10 +221,45 @@ class _ToddlerStoryTellingScreenState extends State<ToddlerStoryTellingScreen>
       await _player.stop();
       await _player.play(DeviceFileSource(file.path));
 
-      if (mounted) setState(() => _currentlyPlayingId = storyId);
+      if (mounted) {
+        setState(() {
+          _currentlyPlayingId = storyId;
+          _currentlyPlayingStory = story;
+        });
+      }
     } catch (e) {
       if (!mounted) return;
       _showSnack('Unable to play story: $e');
+    }
+  }
+
+  Future<void> _recordStoryProgress(Map<String, dynamic> story) async {
+    try {
+      final toddlerId = '${_activeToddler?['_id'] ?? _activeToddler?['id'] ?? ''}'.trim();
+      if (toddlerId.isEmpty) return;
+
+      final storyId = '${story['_id'] ?? story['id'] ?? ''}'.trim();
+      final title = '${story['title'] ?? 'Story Time'}'.trim();
+      final duration = _durationSeconds(story);
+
+      await ApiService.recordToddlerActivityProgress(
+        toddlerId: toddlerId,
+        activityType: 'story_telling',
+        title: 'Listened: $title',
+        score: 100,
+        total: duration > 0 ? duration : 1,
+        correct: duration > 0 ? duration : 1,
+        completed: 1,
+        sourceId: storyId.isNotEmpty ? storyId : 'story_${DateTime.now().millisecondsSinceEpoch}',
+        note: 'Listened to an assigned story.',
+        metadata: {
+          'storyId': storyId,
+          'storyTitle': title,
+          'durationSec': duration,
+        },
+      );
+    } catch (_) {
+      // Story progress should never interrupt audio playback.
     }
   }
 
