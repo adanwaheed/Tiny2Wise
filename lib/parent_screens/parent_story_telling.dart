@@ -8,7 +8,7 @@ import 'package:path_provider/path_provider.dart';
 import 'package:permission_handler/permission_handler.dart';
 import 'package:record/record.dart';
 
-import 'parent_setting_screen.dart';
+import 'parent_setting.dart';
 
 import '../services/api_service.dart';
 

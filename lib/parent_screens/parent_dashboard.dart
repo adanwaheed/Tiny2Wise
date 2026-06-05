@@ -4,14 +4,14 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:image_picker/image_picker.dart';
 
-import '../news/urdu_news_screen.dart';
-import '../toddler_screens/toddler_avatar_screen.dart';
+import '../news/urdu_news_details.dart';
+import '../toddler_screens/toddler_avatar.dart';
 import '../toddler_screens/toddler_mocktest.dart';
 import '../services/api_service.dart';
-import 'parent_setting_screen.dart';
-import 'story_telling_screen.dart';
-import 'assigned_activities_screen.dart';
-import 'toddler_activity.dart';
+import 'parent_setting.dart';
+import 'parent_story_telling.dart';
+import 'parent_assigned_activities.dart';
+import 'parent_toddler_activity.dart';
 
 class ParentDashboardScreen extends StatefulWidget {
   final String parentName;

@@ -3,7 +3,7 @@ import 'package:google_fonts/google_fonts.dart';
 
 import '../models/news_article.dart';
 import '../services/api_service.dart';
-import 'news_summary_screen.dart';
+import 'news_summary.dart';
 import 'saved_news.dart';
 
 class UrduNewsScreen extends StatefulWidget {
@@ -147,7 +147,7 @@ class _UrduNewsScreenState extends State<UrduNewsScreen> {
     });
 
     try {
-      final data = await ApiService.refreshNews(
+      Map<String, dynamic> data = await ApiService.refreshNews(
         days: _selectedDays,
         limit: 30,
         query: _query,
@@ -155,23 +155,58 @@ class _UrduNewsScreenState extends State<UrduNewsScreen> {
         clearCache: true,
       );
 
-      final fetched = (data['articles'] as List<dynamic>? ?? [])
+      var fetched = (data['articles'] as List<dynamic>? ?? [])
           .map((e) => NewsArticle.fromJson(Map<String, dynamic>.from(e as Map)))
+          .where((article) => article.title.trim().isNotEmpty)
           .toList();
 
+      // Safety fallback: older backend versions returned only the crawl count,
+      // not the actual article list. In that case, immediately fetch the freshly
+      // crawled list instead of clearing the UI and showing "No news".
+      if (fetched.isEmpty) {
+        data = await ApiService.getNewsArticles(
+          days: _selectedDays,
+          page: 1,
+          limit: 30,
+          query: _query,
+          topic: _selectedTopic,
+          forceRefresh: true,
+        );
+
+        fetched = (data['articles'] as List<dynamic>? ?? [])
+            .map((e) => NewsArticle.fromJson(Map<String, dynamic>.from(e as Map)))
+            .where((article) => article.title.trim().isNotEmpty)
+            .toList();
+      }
+
+      final pagination = Map<String, dynamic>.from(
+        data['pagination'] as Map? ?? const {},
+      );
 
       if (!mounted) return;
       setState(() {
         _articles
           ..clear()
           ..addAll(fetched);
-        _hasMore = false;
+        _hasMore = pagination['hasMore'] == true;
         _page = 1;
       });
 
-      final updatedCount = (data['insertedOrUpdated'] as num?)?.toInt() ?? fetched.length;
+      final refreshInfo = Map<String, dynamic>.from(
+        data['refresh'] as Map? ?? const {},
+      );
+      final updatedCount = (data['insertedOrUpdated'] as num?)?.toInt() ??
+          (refreshInfo['insertedOrUpdated'] as num?)?.toInt() ??
+          fetched.length;
+
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Latest news refreshed ($updatedCount crawled)')),
+        SnackBar(
+          content: Text(
+            fetched.isEmpty
+                ? 'News crawled, but no matching articles were returned.'
+                : 'Latest news refreshed ($updatedCount crawled)',
+          ),
+        ),
       );
     } catch (e) {
       if (!mounted) return;
@@ -254,12 +289,7 @@ class _UrduNewsScreenState extends State<UrduNewsScreen> {
       _selectedTopic = result;
       _query = '';
     });
-
-    if (_selectedTopic.isNotEmpty) {
-      await _refreshNow();
-    } else {
-      await _loadNews(reset: true);
-    }
+    await _loadNews(reset: true);
   }
 
   String _timeAgo(DateTime? dateTime) {

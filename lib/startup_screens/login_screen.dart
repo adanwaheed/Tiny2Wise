@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'signup_screen.dart';
-import '../parent_screens/parent_dashboard_screen.dart';
-import '../teacher_screens/teacher_dashboard_screen.dart';
+import '../parent_screens/parent_dashboard.dart';
+import '../teacher_screens/teacher_dashboard.dart';
 import '../services/api_service.dart';
 
 class LoginScreen extends StatefulWidget {

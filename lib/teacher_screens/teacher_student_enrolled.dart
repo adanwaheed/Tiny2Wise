@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import '../services/api_service.dart';
-import 'teacher_setting_screen.dart';
+import 'teacher_setting.dart';
 
 class StudentEnolledScreen extends StatefulWidget {
   const StudentEnolledScreen({super.key});

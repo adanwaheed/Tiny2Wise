@@ -5,7 +5,7 @@ import 'package:image_picker/image_picker.dart';
 
 import '../services/api_service.dart';
 import '../startup_screens/login_screen.dart';
-import '../news/urdu_news_screen.dart';
+import '../news/urdu_news_details.dart';
 
 class TeacherSettingScreen extends StatefulWidget {
   const TeacherSettingScreen({super.key});

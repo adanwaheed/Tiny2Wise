@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'login_screen.dart';
-import '../parent_screens/parent_dashboard_screen.dart';
-import '../teacher_screens/teacher_dashboard_screen.dart';
+import '../parent_screens/parent_dashboard.dart';
+import '../teacher_screens/teacher_dashboard.dart';
 import '../services/api_service.dart';
 
 class SignupScreen extends StatefulWidget {
@@ -154,24 +154,13 @@ class _SignupScreenState extends State<SignupScreen> {
                   ),
                 ),
                 const SizedBox(height: 6),
-                const Text(
-                  "Select your role to customize your\nlearning experience.",
-                  style: TextStyle(
-                    color: grey,
-                    fontSize: 13.5,
-                    fontWeight: FontWeight.w500,
-                    height: 1.3,
-                  ),
-                ),
-                const SizedBox(height: 16),
-
                 Row(
                   children: [
                     Expanded(
                       child: _RoleCard(
                         active: isParent,
                         title: "Parent",
-                        subtitle: "Track progress at home",
+                        subtitle: "Home progress",
                         icon: Icons.group_outlined,
                         onTap: () =>
                             setState(() => selectedRole = UserRole.parent),

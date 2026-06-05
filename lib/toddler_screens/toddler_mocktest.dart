@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:math';
 
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
@@ -54,6 +55,8 @@ class _ToddlerMockTestScreenState extends State<ToddlerMockTestScreen> {
   List<Map<String, dynamic>> _questions = [];
   List<Map<String, dynamic>> _answers = [];
   Map<String, dynamic>? _savedResult;
+
+  int _nextMockQuestionCount() => 30 + Random().nextInt(21);
 
   @override
   void initState() {
@@ -169,7 +172,7 @@ class _ToddlerMockTestScreenState extends State<ToddlerMockTestScreen> {
       _savedResult = null;
       _startedAt = DateTime.now();
       _heardText = '';
-      _statusText = 'Generating your AI mock test...';
+      _statusText = 'Generating 30 to 50 AI examples with matching images...';
     });
 
     try {
@@ -177,9 +180,10 @@ class _ToddlerMockTestScreenState extends State<ToddlerMockTestScreen> {
       final toddlerId = _resolvedToddlerId;
       if (toddlerId == null || toddlerId.isEmpty) throw 'Toddler not selected';
 
+      final questionCount = _nextMockQuestionCount();
       final data = await ApiService.generateToddlerMockTest(
         toddlerId: toddlerId,
-        count: 5,
+        count: questionCount,
       );
       final raw = data['questions'] as List<dynamic>? ?? [];
       _questions = raw.map((e) => Map<String, dynamic>.from(e as Map)).toList();
@@ -335,14 +339,61 @@ class _ToddlerMockTestScreenState extends State<ToddlerMockTestScreen> {
             .map((a) => {
           'wordUrdu': a['wordUrdu'],
           'wordEnglish': a['wordEnglish'],
+          'imageKey': a['imageKey'],
           'imageUrl': a['imageUrl'],
+          'imageEmoji': a['imageEmoji'],
           'recognizedText': a['recognizedText'],
         })
             .toList(),
       };
-    } finally {
-      if (mounted) setState(() => _saving = false);
     }
+
+    await _awardMockTestBadgeIfGood();
+
+    if (mounted) setState(() => _saving = false);
+  }
+
+  Future<void> _awardMockTestBadgeIfGood() async {
+    final toddlerId = _resolvedToddlerId?.trim() ?? '';
+    if (toddlerId.isEmpty || _savedResult == null) return;
+
+    final percentage = _toInt(_savedResult?['percentage']);
+    final total = _toInt(_savedResult?['totalQuestions']);
+    final correct = _toInt(_savedResult?['correctCount']);
+    if (percentage < 70) return;
+
+    try {
+      final data = await ApiService.awardToddlerBadge(
+        toddlerId: toddlerId,
+        badgeKey: 'mock_test_trophy',
+        source: 'mock_test',
+        score: percentage,
+        total: total,
+        correct: correct,
+        goalText: 'Score 70% or more in a mock test.',
+        details: {
+          'resultId': (_savedResult?['_id'] ?? _savedResult?['id'] ?? '').toString(),
+        },
+      );
+
+      if (!mounted) return;
+      if (data['newlyUnlocked'] == true) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text("New badge unlocked: ${data['badge']?['title'] ?? 'Mock Test Trophy'} 🏆"),
+            behavior: SnackBarBehavior.floating,
+          ),
+        );
+      }
+    } catch (_) {
+      // Do not block the result screen if badge saving fails.
+    }
+  }
+
+  int _toInt(dynamic value) {
+    if (value is int) return value;
+    if (value is num) return value.round();
+    return int.tryParse(value?.toString() ?? '') ?? 0;
   }
 
   Future<void> _sendReportToTeacher() async {
@@ -398,6 +449,11 @@ class _ToddlerMockTestScreenState extends State<ToddlerMockTestScreen> {
     final q = _currentQuestion;
     final progress = (_currentIndex + 1) / _questions.length;
     final isUrdu = RegExp(r'[\u0600-\u06FF]').hasMatch((q['wordUrdu'] ?? '').toString());
+    final feedbackMode = _statusText == 'Correct!'
+        ? 'correct'
+        : _statusText == 'Wrong answer'
+        ? 'wrong'
+        : '';
 
     return Column(
       children: [
@@ -470,35 +526,43 @@ class _ToddlerMockTestScreenState extends State<ToddlerMockTestScreen> {
                             borderRadius: BorderRadius.circular(14),
                             child: AspectRatio(
                               aspectRatio: 1.12,
-                              child: Stack(
-                                fit: StackFit.expand,
-                                children: [
-                                  Image.network(
-                                    (q['imageUrl'] ?? '').toString(),
-                                    fit: BoxFit.cover,
-                                    errorBuilder: (_, __, ___) => Container(
-                                      color: const Color(0xFFEAF8EF),
-                                      child: const Icon(Icons.image_not_supported_outlined, color: greenDark, size: 44),
-                                    ),
-                                  ),
-                                  Positioned(
-                                    right: 10,
-                                    bottom: 10,
-                                    child: Container(
-                                      width: 42,
-                                      height: 42,
-                                      decoration: const BoxDecoration(
-                                        color: Colors.white,
-                                        shape: BoxShape.circle,
-                                      ),
-                                      child: const Icon(Icons.volume_up_rounded, color: greenDark),
-                                    ),
-                                  ),
-                                ],
+                              child: AnimatedSwitcher(
+                                duration: const Duration(milliseconds: 280),
+                                switchInCurve: Curves.easeOutBack,
+                                switchOutCurve: Curves.easeIn,
+                                transitionBuilder: (child, animation) => ScaleTransition(
+                                  scale: animation,
+                                  child: FadeTransition(opacity: animation, child: child),
+                                ),
+                                child: _MockWordVisual(
+                                  key: ValueKey((q['questionId'] ?? q['imageKey'] ?? _currentIndex).toString()),
+                                  question: q,
+                                  feedback: feedbackMode,
+                                  onSpeakHint: () {
+                                    HapticFeedback.selectionClick();
+                                    final word = (q['wordEnglish'] ?? q['wordUrdu'] ?? '').toString();
+                                    if (!mounted) return;
+                                    setState(() => _statusText = 'Say "$word" clearly');
+                                  },
+                                ),
                               ),
                             ),
                           ),
-                          const SizedBox(height: 18),
+                          const SizedBox(height: 14),
+                          Wrap(
+                            alignment: WrapAlignment.center,
+                            spacing: 7,
+                            runSpacing: 7,
+                            children: [
+                              const _InfoPill(icon: Icons.auto_awesome_rounded, text: 'AI Generated'),
+                              _InfoPill(
+                                icon: Icons.category_rounded,
+                                text: (q['category'] ?? 'Learning').toString(),
+                              ),
+                              const _InfoPill(icon: Icons.verified_rounded, text: 'Exact image'),
+                            ],
+                          ),
+                          const SizedBox(height: 14),
                           FittedBox(
                             fit: BoxFit.scaleDown,
                             child: Text(
@@ -642,7 +706,7 @@ class _ToddlerMockTestScreenState extends State<ToddlerMockTestScreen> {
                     Text(
                       teacherCreated
                           ? 'The mock test report has been sent to the parent.'
-                          : 'You have completed the animal sounds test.',
+                          : 'You have completed the AI mock test.',
                       textAlign: TextAlign.center,
                       style: const TextStyle(color: grey, fontSize: 12.5, fontWeight: FontWeight.w700),
                     ),
@@ -699,6 +763,7 @@ class _ToddlerMockTestScreenState extends State<ToddlerMockTestScreen> {
                 _PracticeTile(
                   title: 'Excellent',
                   subtitle: 'All answers were clear.',
+                  imageKey: 'book',
                   imageUrl: '',
                   retryText: 'Done',
                   onRetry: () => Navigator.pop(context, true),
@@ -710,6 +775,7 @@ class _ToddlerMockTestScreenState extends State<ToddlerMockTestScreen> {
                     child: _PracticeTile(
                       title: (item['wordEnglish'] ?? item['wordUrdu'] ?? 'Word').toString(),
                       subtitle: 'Said: ${(item['recognizedText'] ?? 'Not clear').toString()}',
+                      imageKey: (item['imageKey'] ?? '').toString(),
                       imageUrl: (item['imageUrl'] ?? '').toString(),
                       retryText: 'Retry',
                       onRetry: _loadTest,
@@ -781,9 +847,719 @@ class _ToddlerMockTestScreenState extends State<ToddlerMockTestScreen> {
   }
 }
 
+class _InfoPill extends StatelessWidget {
+  final IconData icon;
+  final String text;
+
+  const _InfoPill({required this.icon, required this.text});
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 6),
+      decoration: BoxDecoration(
+        color: const Color(0xFFE8FFF2),
+        borderRadius: BorderRadius.circular(999),
+        border: Border.all(color: const Color(0xFFBBF7D0)),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(icon, size: 13, color: const Color(0xFF19B95C)),
+          const SizedBox(width: 4),
+          Text(
+            text,
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+            style: const TextStyle(
+              color: Color(0xFF19B95C),
+              fontSize: 10.5,
+              fontWeight: FontWeight.w900,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _MockVisualData {
+  final String key;
+  final String emoji;
+  final String imageUrl;
+  final Color bg1;
+  final Color bg2;
+
+  const _MockVisualData({
+    required this.key,
+    required this.emoji,
+    required this.imageUrl,
+    required this.bg1,
+    required this.bg2,
+  });
+}
+
+String _normalizeMockKey(String value) => value.toLowerCase().trim();
+
+String _resolveMockImageKey({String imageKey = '', String wordEnglish = '', String wordUrdu = ''}) {
+  final key = _normalizeMockKey(imageKey);
+  if (_mockVisuals.containsKey(key)) return key;
+
+  final en = _normalizeMockKey(wordEnglish);
+  final ur = wordUrdu.trim();
+  final byEnglish = <String, String>{
+    "cat": "cat",
+    "dog": "dog",
+    "frog": "frog",
+    "fish": "fish",
+    "bird": "bird",
+    "rabbit": "rabbit",
+    "lion": "lion",
+    "cow": "cow",
+    "goat": "goat",
+    "sheep": "sheep",
+    "horse": "horse",
+    "duck": "duck",
+    "chicken": "chicken",
+    "butterfly": "butterfly",
+    "bee": "bee",
+    "apple": "apple",
+    "banana": "banana",
+    "orange": "orange",
+    "mango": "mango",
+    "grapes": "grapes",
+    "watermelon": "watermelon",
+    "strawberry": "strawberry",
+    "carrot": "carrot",
+    "tomato": "tomato",
+    "bread": "bread",
+    "milk": "milk",
+    "water": "water",
+    "egg": "egg",
+    "rice": "rice",
+    "cake": "cake",
+    "ball": "ball",
+    "book": "book",
+    "car": "car",
+    "bus": "bus",
+    "train": "train",
+    "bike": "bike",
+    "house": "house",
+    "school": "school",
+    "pencil": "pencil",
+    "bag": "bag",
+    "chair": "chair",
+    "bed": "bed",
+    "clock": "clock",
+    "sun": "sun",
+    "moon": "moon",
+    "star": "star",
+    "cloud": "cloud",
+    "rainbow": "rainbow",
+    "flower": "flower",
+    "tree": "tree",
+  };
+  if (byEnglish.containsKey(en)) return byEnglish[en]!;
+
+  final byUrdu = <String, String>{
+    "بلی": "cat",
+    "کتا": "dog",
+    "مینڈک": "frog",
+    "مچھلی": "fish",
+    "پرندہ": "bird",
+    "خرگوش": "rabbit",
+    "شیر": "lion",
+    "گائے": "cow",
+    "بکری": "goat",
+    "بھیڑ": "sheep",
+    "گھوڑا": "horse",
+    "بطخ": "duck",
+    "مرغی": "chicken",
+    "تتلی": "butterfly",
+    "مکھی": "bee",
+    "سیب": "apple",
+    "کیلا": "banana",
+    "مالٹا": "orange",
+    "آم": "mango",
+    "انگور": "grapes",
+    "تربوز": "watermelon",
+    "اسٹرابیری": "strawberry",
+    "گاجر": "carrot",
+    "ٹماٹر": "tomato",
+    "ڈبل روٹی": "bread",
+    "دودھ": "milk",
+    "پانی": "water",
+    "انڈا": "egg",
+    "چاول": "rice",
+    "کیک": "cake",
+    "گیند": "ball",
+    "کتاب": "book",
+    "گاڑی": "car",
+    "بس": "bus",
+    "ریل گاڑی": "train",
+    "سائیکل": "bike",
+    "گھر": "house",
+    "اسکول": "school",
+    "پنسل": "pencil",
+    "بیگ": "bag",
+    "کرسی": "chair",
+    "بستر": "bed",
+    "گھڑی": "clock",
+    "سورج": "sun",
+    "چاند": "moon",
+    "ستارہ": "star",
+    "بادل": "cloud",
+    "قوس قزح": "rainbow",
+    "پھول": "flower",
+    "درخت": "tree",
+  };
+  return byUrdu[ur] ?? 'book';
+}
+
+const Map<String, _MockVisualData> _mockVisuals = {
+  "cat": _MockVisualData(
+    key: "cat",
+    emoji: "🐱",
+    imageUrl: "https://cdn.jsdelivr.net/gh/twitter/twemoji@14.0.2/assets/72x72/1f431.png",
+    bg1: Color(0xFFFFF3D9),
+    bg2: Color(0xFFFFD6A5),
+  ),
+  "dog": _MockVisualData(
+    key: "dog",
+    emoji: "🐶",
+    imageUrl: "https://cdn.jsdelivr.net/gh/twitter/twemoji@14.0.2/assets/72x72/1f436.png",
+    bg1: Color(0xFFFFF1E6),
+    bg2: Color(0xFFFFC7A8),
+  ),
+  "frog": _MockVisualData(
+    key: "frog",
+    emoji: "🐸",
+    imageUrl: "https://cdn.jsdelivr.net/gh/twitter/twemoji@14.0.2/assets/72x72/1f438.png",
+    bg1: Color(0xFFE8FFF2),
+    bg2: Color(0xFFB8F7CF),
+  ),
+  "fish": _MockVisualData(
+    key: "fish",
+    emoji: "🐟",
+    imageUrl: "https://cdn.jsdelivr.net/gh/twitter/twemoji@14.0.2/assets/72x72/1f41f.png",
+    bg1: Color(0xFFE7FAFF),
+    bg2: Color(0xFFB8F0FF),
+  ),
+  "bird": _MockVisualData(
+    key: "bird",
+    emoji: "🐦",
+    imageUrl: "https://cdn.jsdelivr.net/gh/twitter/twemoji@14.0.2/assets/72x72/1f426.png",
+    bg1: Color(0xFFEAF2FF),
+    bg2: Color(0xFFBFD6FF),
+  ),
+  "rabbit": _MockVisualData(
+    key: "rabbit",
+    emoji: "🐰",
+    imageUrl: "https://cdn.jsdelivr.net/gh/twitter/twemoji@14.0.2/assets/72x72/1f430.png",
+    bg1: Color(0xFFFFF0F6),
+    bg2: Color(0xFFFFCFE2),
+  ),
+  "lion": _MockVisualData(
+    key: "lion",
+    emoji: "🦁",
+    imageUrl: "https://cdn.jsdelivr.net/gh/twitter/twemoji@14.0.2/assets/72x72/1f981.png",
+    bg1: Color(0xFFFFECEF),
+    bg2: Color(0xFFFFB3BF),
+  ),
+  "cow": _MockVisualData(
+    key: "cow",
+    emoji: "🐮",
+    imageUrl: "https://cdn.jsdelivr.net/gh/twitter/twemoji@14.0.2/assets/72x72/1f42e.png",
+    bg1: Color(0xFFFFF9DB),
+    bg2: Color(0xFFFFE58A),
+  ),
+  "goat": _MockVisualData(
+    key: "goat",
+    emoji: "🐐",
+    imageUrl: "https://cdn.jsdelivr.net/gh/twitter/twemoji@14.0.2/assets/72x72/1f410.png",
+    bg1: Color(0xFFF0ECFF),
+    bg2: Color(0xFFD4C8FF),
+  ),
+  "sheep": _MockVisualData(
+    key: "sheep",
+    emoji: "🐑",
+    imageUrl: "https://cdn.jsdelivr.net/gh/twitter/twemoji@14.0.2/assets/72x72/1f411.png",
+    bg1: Color(0xFFE8F5E9),
+    bg2: Color(0xFFC8E6C9),
+  ),
+  "horse": _MockVisualData(
+    key: "horse",
+    emoji: "🐴",
+    imageUrl: "https://cdn.jsdelivr.net/gh/twitter/twemoji@14.0.2/assets/72x72/1f434.png",
+    bg1: Color(0xFFFFF4C2),
+    bg2: Color(0xFFFFD66B),
+  ),
+  "duck": _MockVisualData(
+    key: "duck",
+    emoji: "🦆",
+    imageUrl: "https://cdn.jsdelivr.net/gh/twitter/twemoji@14.0.2/assets/72x72/1f986.png",
+    bg1: Color(0xFFEAEAFF),
+    bg2: Color(0xFFC8C7FF),
+  ),
+  "chicken": _MockVisualData(
+    key: "chicken",
+    emoji: "🐔",
+    imageUrl: "https://cdn.jsdelivr.net/gh/twitter/twemoji@14.0.2/assets/72x72/1f414.png",
+    bg1: Color(0xFFE6F0FF),
+    bg2: Color(0xFFC9DCFF),
+  ),
+  "butterfly": _MockVisualData(
+    key: "butterfly",
+    emoji: "🦋",
+    imageUrl: "https://cdn.jsdelivr.net/gh/twitter/twemoji@14.0.2/assets/72x72/1f98b.png",
+    bg1: Color(0xFFFFECEF),
+    bg2: Color(0xFFFFC8D0),
+  ),
+  "bee": _MockVisualData(
+    key: "bee",
+    emoji: "🐝",
+    imageUrl: "https://cdn.jsdelivr.net/gh/twitter/twemoji@14.0.2/assets/72x72/1f41d.png",
+    bg1: Color(0xFFFFFFFF),
+    bg2: Color(0xFFE6F0FF),
+  ),
+  "apple": _MockVisualData(
+    key: "apple",
+    emoji: "🍎",
+    imageUrl: "https://cdn.jsdelivr.net/gh/twitter/twemoji@14.0.2/assets/72x72/1f34e.png",
+    bg1: Color(0xFFFFF3D9),
+    bg2: Color(0xFFFFD6A5),
+  ),
+  "banana": _MockVisualData(
+    key: "banana",
+    emoji: "🍌",
+    imageUrl: "https://cdn.jsdelivr.net/gh/twitter/twemoji@14.0.2/assets/72x72/1f34c.png",
+    bg1: Color(0xFFFFF1E6),
+    bg2: Color(0xFFFFC7A8),
+  ),
+  "orange": _MockVisualData(
+    key: "orange",
+    emoji: "🍊",
+    imageUrl: "https://cdn.jsdelivr.net/gh/twitter/twemoji@14.0.2/assets/72x72/1f34a.png",
+    bg1: Color(0xFFE8FFF2),
+    bg2: Color(0xFFB8F7CF),
+  ),
+  "mango": _MockVisualData(
+    key: "mango",
+    emoji: "🥭",
+    imageUrl: "https://cdn.jsdelivr.net/gh/twitter/twemoji@14.0.2/assets/72x72/1f96d.png",
+    bg1: Color(0xFFE7FAFF),
+    bg2: Color(0xFFB8F0FF),
+  ),
+  "grapes": _MockVisualData(
+    key: "grapes",
+    emoji: "🍇",
+    imageUrl: "https://cdn.jsdelivr.net/gh/twitter/twemoji@14.0.2/assets/72x72/1f347.png",
+    bg1: Color(0xFFEAF2FF),
+    bg2: Color(0xFFBFD6FF),
+  ),
+  "watermelon": _MockVisualData(
+    key: "watermelon",
+    emoji: "🍉",
+    imageUrl: "https://cdn.jsdelivr.net/gh/twitter/twemoji@14.0.2/assets/72x72/1f349.png",
+    bg1: Color(0xFFFFF0F6),
+    bg2: Color(0xFFFFCFE2),
+  ),
+  "strawberry": _MockVisualData(
+    key: "strawberry",
+    emoji: "🍓",
+    imageUrl: "https://cdn.jsdelivr.net/gh/twitter/twemoji@14.0.2/assets/72x72/1f353.png",
+    bg1: Color(0xFFFFECEF),
+    bg2: Color(0xFFFFB3BF),
+  ),
+  "carrot": _MockVisualData(
+    key: "carrot",
+    emoji: "🥕",
+    imageUrl: "https://cdn.jsdelivr.net/gh/twitter/twemoji@14.0.2/assets/72x72/1f955.png",
+    bg1: Color(0xFFFFF9DB),
+    bg2: Color(0xFFFFE58A),
+  ),
+  "tomato": _MockVisualData(
+    key: "tomato",
+    emoji: "🍅",
+    imageUrl: "https://cdn.jsdelivr.net/gh/twitter/twemoji@14.0.2/assets/72x72/1f345.png",
+    bg1: Color(0xFFF0ECFF),
+    bg2: Color(0xFFD4C8FF),
+  ),
+  "bread": _MockVisualData(
+    key: "bread",
+    emoji: "🍞",
+    imageUrl: "https://cdn.jsdelivr.net/gh/twitter/twemoji@14.0.2/assets/72x72/1f35e.png",
+    bg1: Color(0xFFE8F5E9),
+    bg2: Color(0xFFC8E6C9),
+  ),
+  "milk": _MockVisualData(
+    key: "milk",
+    emoji: "🥛",
+    imageUrl: "https://cdn.jsdelivr.net/gh/twitter/twemoji@14.0.2/assets/72x72/1f95b.png",
+    bg1: Color(0xFFFFF4C2),
+    bg2: Color(0xFFFFD66B),
+  ),
+  "water": _MockVisualData(
+    key: "water",
+    emoji: "💧",
+    imageUrl: "https://cdn.jsdelivr.net/gh/twitter/twemoji@14.0.2/assets/72x72/1f4a7.png",
+    bg1: Color(0xFFEAEAFF),
+    bg2: Color(0xFFC8C7FF),
+  ),
+  "egg": _MockVisualData(
+    key: "egg",
+    emoji: "🥚",
+    imageUrl: "https://cdn.jsdelivr.net/gh/twitter/twemoji@14.0.2/assets/72x72/1f95a.png",
+    bg1: Color(0xFFE6F0FF),
+    bg2: Color(0xFFC9DCFF),
+  ),
+  "rice": _MockVisualData(
+    key: "rice",
+    emoji: "🍚",
+    imageUrl: "https://cdn.jsdelivr.net/gh/twitter/twemoji@14.0.2/assets/72x72/1f35a.png",
+    bg1: Color(0xFFFFECEF),
+    bg2: Color(0xFFFFC8D0),
+  ),
+  "cake": _MockVisualData(
+    key: "cake",
+    emoji: "🍰",
+    imageUrl: "https://cdn.jsdelivr.net/gh/twitter/twemoji@14.0.2/assets/72x72/1f370.png",
+    bg1: Color(0xFFFFFFFF),
+    bg2: Color(0xFFE6F0FF),
+  ),
+  "ball": _MockVisualData(
+    key: "ball",
+    emoji: "⚽",
+    imageUrl: "https://cdn.jsdelivr.net/gh/twitter/twemoji@14.0.2/assets/72x72/26bd.png",
+    bg1: Color(0xFFFFF3D9),
+    bg2: Color(0xFFFFD6A5),
+  ),
+  "book": _MockVisualData(
+    key: "book",
+    emoji: "📖",
+    imageUrl: "https://cdn.jsdelivr.net/gh/twitter/twemoji@14.0.2/assets/72x72/1f4d6.png",
+    bg1: Color(0xFFFFF1E6),
+    bg2: Color(0xFFFFC7A8),
+  ),
+  "car": _MockVisualData(
+    key: "car",
+    emoji: "🚗",
+    imageUrl: "https://cdn.jsdelivr.net/gh/twitter/twemoji@14.0.2/assets/72x72/1f697.png",
+    bg1: Color(0xFFE8FFF2),
+    bg2: Color(0xFFB8F7CF),
+  ),
+  "bus": _MockVisualData(
+    key: "bus",
+    emoji: "🚌",
+    imageUrl: "https://cdn.jsdelivr.net/gh/twitter/twemoji@14.0.2/assets/72x72/1f68c.png",
+    bg1: Color(0xFFE7FAFF),
+    bg2: Color(0xFFB8F0FF),
+  ),
+  "train": _MockVisualData(
+    key: "train",
+    emoji: "🚆",
+    imageUrl: "https://cdn.jsdelivr.net/gh/twitter/twemoji@14.0.2/assets/72x72/1f686.png",
+    bg1: Color(0xFFEAF2FF),
+    bg2: Color(0xFFBFD6FF),
+  ),
+  "bike": _MockVisualData(
+    key: "bike",
+    emoji: "🚲",
+    imageUrl: "https://cdn.jsdelivr.net/gh/twitter/twemoji@14.0.2/assets/72x72/1f6b2.png",
+    bg1: Color(0xFFFFF0F6),
+    bg2: Color(0xFFFFCFE2),
+  ),
+  "house": _MockVisualData(
+    key: "house",
+    emoji: "🏠",
+    imageUrl: "https://cdn.jsdelivr.net/gh/twitter/twemoji@14.0.2/assets/72x72/1f3e0.png",
+    bg1: Color(0xFFFFECEF),
+    bg2: Color(0xFFFFB3BF),
+  ),
+  "school": _MockVisualData(
+    key: "school",
+    emoji: "🏫",
+    imageUrl: "https://cdn.jsdelivr.net/gh/twitter/twemoji@14.0.2/assets/72x72/1f3eb.png",
+    bg1: Color(0xFFFFF9DB),
+    bg2: Color(0xFFFFE58A),
+  ),
+  "pencil": _MockVisualData(
+    key: "pencil",
+    emoji: "✏️",
+    imageUrl: "https://cdn.jsdelivr.net/gh/twitter/twemoji@14.0.2/assets/72x72/270f.png",
+    bg1: Color(0xFFF0ECFF),
+    bg2: Color(0xFFD4C8FF),
+  ),
+  "bag": _MockVisualData(
+    key: "bag",
+    emoji: "🎒",
+    imageUrl: "https://cdn.jsdelivr.net/gh/twitter/twemoji@14.0.2/assets/72x72/1f392.png",
+    bg1: Color(0xFFE8F5E9),
+    bg2: Color(0xFFC8E6C9),
+  ),
+  "chair": _MockVisualData(
+    key: "chair",
+    emoji: "🪑",
+    imageUrl: "https://cdn.jsdelivr.net/gh/twitter/twemoji@14.0.2/assets/72x72/1fa91.png",
+    bg1: Color(0xFFFFF4C2),
+    bg2: Color(0xFFFFD66B),
+  ),
+  "bed": _MockVisualData(
+    key: "bed",
+    emoji: "🛏️",
+    imageUrl: "https://cdn.jsdelivr.net/gh/twitter/twemoji@14.0.2/assets/72x72/1f6cf.png",
+    bg1: Color(0xFFEAEAFF),
+    bg2: Color(0xFFC8C7FF),
+  ),
+  "clock": _MockVisualData(
+    key: "clock",
+    emoji: "⏰",
+    imageUrl: "https://cdn.jsdelivr.net/gh/twitter/twemoji@14.0.2/assets/72x72/23f0.png",
+    bg1: Color(0xFFE6F0FF),
+    bg2: Color(0xFFC9DCFF),
+  ),
+  "sun": _MockVisualData(
+    key: "sun",
+    emoji: "☀️",
+    imageUrl: "https://cdn.jsdelivr.net/gh/twitter/twemoji@14.0.2/assets/72x72/2600.png",
+    bg1: Color(0xFFFFECEF),
+    bg2: Color(0xFFFFC8D0),
+  ),
+  "moon": _MockVisualData(
+    key: "moon",
+    emoji: "🌙",
+    imageUrl: "https://cdn.jsdelivr.net/gh/twitter/twemoji@14.0.2/assets/72x72/1f319.png",
+    bg1: Color(0xFFFFFFFF),
+    bg2: Color(0xFFE6F0FF),
+  ),
+  "star": _MockVisualData(
+    key: "star",
+    emoji: "⭐",
+    imageUrl: "https://cdn.jsdelivr.net/gh/twitter/twemoji@14.0.2/assets/72x72/2b50.png",
+    bg1: Color(0xFFFFF3D9),
+    bg2: Color(0xFFFFD6A5),
+  ),
+  "cloud": _MockVisualData(
+    key: "cloud",
+    emoji: "☁️",
+    imageUrl: "https://cdn.jsdelivr.net/gh/twitter/twemoji@14.0.2/assets/72x72/2601.png",
+    bg1: Color(0xFFFFF1E6),
+    bg2: Color(0xFFFFC7A8),
+  ),
+  "rainbow": _MockVisualData(
+    key: "rainbow",
+    emoji: "🌈",
+    imageUrl: "https://cdn.jsdelivr.net/gh/twitter/twemoji@14.0.2/assets/72x72/1f308.png",
+    bg1: Color(0xFFE8FFF2),
+    bg2: Color(0xFFB8F7CF),
+  ),
+  "flower": _MockVisualData(
+    key: "flower",
+    emoji: "🌼",
+    imageUrl: "https://cdn.jsdelivr.net/gh/twitter/twemoji@14.0.2/assets/72x72/1f33c.png",
+    bg1: Color(0xFFE7FAFF),
+    bg2: Color(0xFFB8F0FF),
+  ),
+  "tree": _MockVisualData(
+    key: "tree",
+    emoji: "🌳",
+    imageUrl: "https://cdn.jsdelivr.net/gh/twitter/twemoji@14.0.2/assets/72x72/1f333.png",
+    bg1: Color(0xFFEAF2FF),
+    bg2: Color(0xFFBFD6FF),
+  ),
+};
+
+class _MockWordVisual extends StatelessWidget {
+  final Map<String, dynamic> question;
+  final String feedback;
+  final VoidCallback onSpeakHint;
+
+  const _MockWordVisual({
+    super.key,
+    required this.question,
+    required this.feedback,
+    required this.onSpeakHint,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final keyName = _resolveMockImageKey(
+      imageKey: (question['imageKey'] ?? '').toString(),
+      wordEnglish: (question['wordEnglish'] ?? '').toString(),
+      wordUrdu: (question['wordUrdu'] ?? '').toString(),
+    );
+    final data = _mockVisuals[keyName] ?? _mockVisuals['book']!;
+    final serverImageUrl = (question['imageUrl'] ?? '').toString().trim();
+    final resolvedImageUrl = _mockVisuals.containsKey(keyName) ? data.imageUrl : (serverImageUrl.isNotEmpty ? serverImageUrl : data.imageUrl);
+    final wordEnglish = (question['wordEnglish'] ?? '').toString();
+
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final size = (constraints.biggest.shortestSide * 0.56).clamp(92.0, 190.0).toDouble();
+        return Container(
+          decoration: BoxDecoration(
+            gradient: LinearGradient(
+              begin: Alignment.topLeft,
+              end: Alignment.bottomRight,
+              colors: [data.bg1, data.bg2],
+            ),
+            borderRadius: BorderRadius.circular(14),
+          ),
+          child: Stack(
+            children: [
+              Positioned(
+                top: 18,
+                left: 18,
+                child: Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                  decoration: BoxDecoration(
+                    color: Colors.white.withOpacity(0.78),
+                    borderRadius: BorderRadius.circular(999),
+                  ),
+                  child: Text(
+                    keyName.toUpperCase(),
+                    style: const TextStyle(
+                      color: Color(0xFF14201A),
+                      fontSize: 10,
+                      fontWeight: FontWeight.w900,
+                      letterSpacing: 0.6,
+                    ),
+                  ),
+                ),
+              ),
+              Center(
+                child: Container(
+                  width: size,
+                  height: size,
+                  padding: EdgeInsets.all(size * 0.12),
+                  decoration: BoxDecoration(
+                    color: Colors.white.withOpacity(0.86),
+                    shape: BoxShape.circle,
+                    boxShadow: [
+                      BoxShadow(
+                        color: Colors.black.withOpacity(0.08),
+                        blurRadius: 18,
+                        offset: const Offset(0, 10),
+                      ),
+                    ],
+                  ),
+                  child: Image.network(
+                    resolvedImageUrl,
+                    fit: BoxFit.contain,
+                    filterQuality: FilterQuality.high,
+                    errorBuilder: (_, __, ___) => FittedBox(
+                      fit: BoxFit.contain,
+                      child: Text(data.emoji, textAlign: TextAlign.center),
+                    ),
+                  ),
+                ),
+              ),
+              Positioned(
+                right: 10,
+                bottom: 10,
+                child: Material(
+                  color: Colors.white,
+                  shape: const CircleBorder(),
+                  elevation: 2,
+                  child: InkWell(
+                    customBorder: const CircleBorder(),
+                    onTap: onSpeakHint,
+                    child: const SizedBox(
+                      width: 42,
+                      height: 42,
+                      child: Icon(Icons.volume_up_rounded, color: Color(0xFF19B95C)),
+                    ),
+                  ),
+                ),
+              ),
+              if (feedback.isNotEmpty)
+                Positioned(
+                  left: 12,
+                  bottom: 12,
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 11, vertical: 7),
+                    decoration: BoxDecoration(
+                      color: feedback == 'correct' ? const Color(0xFF19B95C) : Colors.redAccent,
+                      borderRadius: BorderRadius.circular(999),
+                    ),
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Icon(
+                          feedback == 'correct' ? Icons.check_rounded : Icons.close_rounded,
+                          color: Colors.white,
+                          size: 16,
+                        ),
+                        const SizedBox(width: 4),
+                        Text(
+                          feedback == 'correct' ? 'Correct' : 'Try again',
+                          style: const TextStyle(color: Colors.white, fontSize: 11, fontWeight: FontWeight.w900),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+              Positioned(
+                left: 14,
+                right: 14,
+                top: 54,
+                child: Text(
+                  wordEnglish.isEmpty ? 'Say the word' : 'Say: $wordEnglish',
+                  textAlign: TextAlign.center,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: const TextStyle(
+                    color: Color(0xFF14201A),
+                    fontSize: 12,
+                    fontWeight: FontWeight.w900,
+                  ),
+                ),
+              ),
+            ],
+          ),
+        );
+      },
+    );
+  }
+}
+
+class _MiniMockWordVisual extends StatelessWidget {
+  final String imageKey;
+  final String imageUrl;
+  final String wordEnglish;
+
+  const _MiniMockWordVisual({
+    required this.imageKey,
+    required this.imageUrl,
+    required this.wordEnglish,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final keyName = _resolveMockImageKey(imageKey: imageKey, wordEnglish: wordEnglish);
+    final data = _mockVisuals[keyName] ?? _mockVisuals['book']!;
+    final resolvedUrl = _mockVisuals.containsKey(keyName) ? data.imageUrl : (imageUrl.isNotEmpty ? imageUrl : data.imageUrl);
+
+    return Container(
+      decoration: BoxDecoration(
+        gradient: LinearGradient(colors: [data.bg1, data.bg2]),
+        borderRadius: BorderRadius.circular(10),
+      ),
+      padding: const EdgeInsets.all(8),
+      child: Image.network(
+        resolvedUrl,
+        fit: BoxFit.contain,
+        filterQuality: FilterQuality.high,
+        errorBuilder: (_, __, ___) => FittedBox(child: Text(data.emoji)),
+      ),
+    );
+  }
+}
+
 class _PracticeTile extends StatelessWidget {
   final String title;
   final String subtitle;
+  final String imageKey;
   final String imageUrl;
   final String retryText;
   final VoidCallback onRetry;
@@ -791,6 +1567,7 @@ class _PracticeTile extends StatelessWidget {
   const _PracticeTile({
     required this.title,
     required this.subtitle,
+    required this.imageKey,
     required this.imageUrl,
     required this.retryText,
     required this.onRetry,
@@ -812,12 +1589,10 @@ class _PracticeTile extends StatelessWidget {
             child: SizedBox(
               width: 46,
               height: 46,
-              child: imageUrl.isEmpty
-                  ? Container(color: const Color(0xFFEAF8EF), child: const Icon(Icons.check_rounded, color: Color(0xFF19B95C)))
-                  : Image.network(
-                imageUrl,
-                fit: BoxFit.cover,
-                errorBuilder: (_, __, ___) => Container(color: const Color(0xFFEAF8EF), child: const Icon(Icons.image_outlined, color: Color(0xFF19B95C))),
+              child: _MiniMockWordVisual(
+                imageKey: imageKey,
+                imageUrl: imageUrl,
+                wordEnglish: title,
               ),
             ),
           ),

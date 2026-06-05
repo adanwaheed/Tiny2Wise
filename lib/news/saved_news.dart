@@ -3,8 +3,8 @@ import 'package:google_fonts/google_fonts.dart';
 
 import '../models/news_article.dart';
 import '../services/api_service.dart';
-import 'news_summary_screen.dart';
-import 'urdu_news_screen.dart';
+import 'news_summary.dart';
+import 'urdu_news_details.dart';
 
 class SavedNewsScreen extends StatefulWidget {
   const SavedNewsScreen({super.key});

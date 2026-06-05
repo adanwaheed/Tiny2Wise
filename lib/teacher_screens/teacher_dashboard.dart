@@ -1,9 +1,9 @@
 import 'package:flutter/material.dart';
 import '../services/api_service.dart';
-import 'teacher_meetings_screen.dart';
-import 'student_enrolled_screen.dart';
-import 'teacher_setting_screen.dart';
-import 'student_activity_screen.dart';
+import 'teacher_ptm.dart';
+import 'teacher_student_enrolled.dart';
+import 'teacher_setting.dart';
+import 'teacher_student_activity.dart';
 import '../toddler_screens/toddler_mocktest.dart';
 
 class TeacherDashboardScreen extends StatefulWidget {

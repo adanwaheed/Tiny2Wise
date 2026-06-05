@@ -7,7 +7,7 @@ import 'package:share_plus/share_plus.dart';
 import '../models/news_article.dart';
 import '../services/api_service.dart';
 import 'saved_news.dart';
-import 'urdu_news_screen.dart';
+import 'urdu_news_details.dart';
 
 class NewsSummaryScreen extends StatefulWidget {
   final NewsArticle initialArticle;

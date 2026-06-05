@@ -297,9 +297,95 @@ class ApiService {
     return data;
   }
 
+
+  static Future<Map<String, dynamic>?> getActiveToddler() async {
+    final toddlers = await getToddlers();
+    if (toddlers.isEmpty) return null;
+
+    final maps = toddlers
+        .whereType<Map>()
+        .map((item) => Map<String, dynamic>.from(item))
+        .toList();
+
+    if (maps.isEmpty) return null;
+
+    return maps.firstWhere(
+          (t) => t['isActive'] == true,
+      orElse: () => maps.first,
+    );
+  }
+
+  // -------------------- TODDLER BADGES --------------------
+
+  static Future<Map<String, dynamic>> getToddlerBadges({
+    required String toddlerId,
+  }) async {
+    final headers = await _authHeaders();
+    final cacheBuster = DateTime.now().millisecondsSinceEpoch;
+
+    final res = await http
+        .get(
+      Uri.parse('$baseUrl/api/toddlers/${toddlerId.trim()}/badges?t=$cacheBuster'),
+      headers: {
+        ...headers,
+        'Cache-Control': 'no-cache',
+        'Pragma': 'no-cache',
+      },
+    )
+        .timeout(const Duration(seconds: 25));
+
+    final data = _safeJson(res.body);
+    if (res.statusCode != 200) {
+      throw (data['message'] ?? 'Failed to load toddler badges').toString();
+    }
+    return data;
+  }
+
+  static Future<Map<String, dynamic>> awardToddlerBadge({
+    required String toddlerId,
+    required String badgeKey,
+    required String source,
+    int score = 0,
+    int total = 0,
+    int correct = 0,
+    String goalText = '',
+    Map<String, dynamic> details = const {},
+  }) async {
+    final headers = await _authHeaders();
+
+    final res = await http
+        .post(
+      Uri.parse('$baseUrl/api/toddlers/${toddlerId.trim()}/badges/award'),
+      headers: {
+        ...headers,
+        'Content-Type': 'application/json',
+      },
+      body: jsonEncode({
+        'badgeKey': badgeKey.trim(),
+        'source': source.trim(),
+        'score': score,
+        'total': total,
+        'correct': correct,
+        'goalText': goalText.trim(),
+        'details': details,
+      }),
+    )
+        .timeout(const Duration(seconds: 25));
+
+    final data = _safeJson(res.body);
+    if (res.statusCode != 200) {
+      throw (data['message'] ?? 'Failed to award badge').toString();
+    }
+    return data;
+  }
+
   // -------------------- TODDLER 3D AVATAR / GEMINI CHAT --------------------
 
-  static Future<String> sendToddlerAvatarMessage({
+  /// New compatible method used by ToddlerAvatarScreen.
+  ///
+  /// It returns the full backend response Map, so screens can read:
+  /// reply, inputLanguage, ttsLanguage, avatarAction, avatarEmotion, source, etc.
+  static Future<Map<String, dynamic>> sendToddlerAvatarTurn({
     required String message,
     String languageMode = 'auto',
     String? toddlerId,
@@ -327,7 +413,7 @@ class ApiService {
           'toddlerId': toddlerId.trim(),
       }),
     )
-        .timeout(const Duration(seconds: 75));
+        .timeout(const Duration(seconds: 120));
 
     final data = _safeJson(response.body);
 
@@ -348,7 +434,104 @@ class ApiService {
       throw 'Gemini returned empty reply';
     }
 
-    return reply;
+    return {
+      ...data,
+      'reply': reply,
+      'inputLanguage': data['inputLanguage']?.toString() ?? languageMode,
+      'ttsLanguage': data['ttsLanguage']?.toString() ??
+          (RegExp(r'[\u0600-\u06FF]').hasMatch(reply) ? 'ur-PK' : 'en-US'),
+      'avatarAction': data['avatarAction']?.toString() ?? 'talk',
+      'avatarEmotion': data['avatarEmotion']?.toString() ?? 'friendly',
+    };
+  }
+
+  /// Old compatible method used by older screens.
+  ///
+  /// Keep this method so existing ToddlerAvatarScreen files that expect only
+  /// a String reply still compile correctly.
+  static Future<String> sendToddlerAvatarMessage({
+    required String message,
+    String languageMode = 'auto',
+    String? toddlerId,
+  }) async {
+    final data = await sendToddlerAvatarTurn(
+      message: message,
+      languageMode: languageMode,
+      toddlerId: toddlerId,
+    );
+
+    return data['reply']?.toString().trim() ?? '';
+  }
+
+
+
+  // -------------------- TODDLER AI SPEECH GAMES --------------------
+
+  /// Generates toddler speech-practice games.
+  ///
+  /// The backend uses Gemini when GEMINI_API_KEY is available and automatically
+  /// falls back to safe local toddler-friendly games when the AI service is not
+  /// configured or is temporarily unavailable.
+  static Future<Map<String, dynamic>> generateToddlerSpeechGames({
+    int countPerGame = 5,
+    String languageMode = 'mixed',
+  }) async {
+    final token = await getToken();
+
+    final response = await http
+        .post(
+      Uri.parse('$baseUrl/api/toddler/speech-games/generate'),
+      headers: {
+        'Content-Type': 'application/json',
+        if (token != null && token.isNotEmpty) 'Authorization': 'Bearer $token',
+      },
+      body: jsonEncode({
+        'countPerGame': countPerGame,
+        'languageMode': languageMode,
+      }),
+    )
+        .timeout(const Duration(seconds: 70));
+
+    final data = _safeJson(response.body);
+    if (response.statusCode < 200 || response.statusCode >= 300) {
+      throw (data['message'] ?? 'Failed to generate toddler games').toString();
+    }
+    return data;
+  }
+
+
+
+  // -------------------- TODDLER AI PUZZLES --------------------
+
+  /// Generates toddler puzzle games for drag-and-match speech practice.
+  ///
+  /// The backend uses Gemini when GEMINI_API_KEY is configured and safely
+  /// falls back to local toddler-friendly puzzles when AI is unavailable.
+  static Future<Map<String, dynamic>> generateToddlerPuzzles({
+    int countPerGame = 6,
+    String languageMode = 'mixed',
+  }) async {
+    final token = await getToken();
+
+    final response = await http
+        .post(
+      Uri.parse('$baseUrl/api/toddler/puzzles/generate'),
+      headers: {
+        'Content-Type': 'application/json',
+        if (token != null && token.isNotEmpty) 'Authorization': 'Bearer $token',
+      },
+      body: jsonEncode({
+        'countPerGame': countPerGame,
+        'languageMode': languageMode,
+      }),
+    )
+        .timeout(const Duration(seconds: 70));
+
+    final data = _safeJson(response.body);
+    if (response.statusCode < 200 || response.statusCode >= 300) {
+      throw (data['message'] ?? 'Failed to generate toddler puzzles').toString();
+    }
+    return data;
   }
 
   // -------------------- STORY STUDIO --------------------
@@ -359,11 +542,16 @@ class ApiService {
 
   static Future<List<dynamic>> getStories() async {
     final headers = await _authHeaders();
+    final cacheBuster = DateTime.now().millisecondsSinceEpoch;
 
     final res = await http
         .get(
-      Uri.parse('$baseUrl/api/stories'),
-      headers: headers,
+      Uri.parse('$baseUrl/api/stories?t=$cacheBuster'),
+      headers: {
+        ...headers,
+        'Cache-Control': 'no-cache',
+        'Pragma': 'no-cache',
+      },
     )
         .timeout(const Duration(seconds: 25));
 
@@ -373,6 +561,30 @@ class ApiService {
     }
 
     return (data['stories'] as List<dynamic>? ?? []);
+  }
+
+  static Future<Map<String, dynamic>> getToddlerAssignedStories(String toddlerId) async {
+    final headers = await _authHeaders();
+    final safeToddlerId = toddlerId.trim();
+    final cacheBuster = DateTime.now().millisecondsSinceEpoch;
+
+    final res = await http
+        .get(
+      Uri.parse('$baseUrl/api/toddlers/$safeToddlerId/stories?t=$cacheBuster'),
+      headers: {
+        ...headers,
+        'Cache-Control': 'no-cache',
+        'Pragma': 'no-cache',
+      },
+    )
+        .timeout(const Duration(seconds: 25));
+
+    final data = _safeJson(res.body);
+    if (res.statusCode != 200) {
+      throw (data['message'] ?? 'Failed to load toddler stories').toString();
+    }
+
+    return data;
   }
 
   static Future<Map<String, dynamic>> createStory({
@@ -947,7 +1159,7 @@ class ApiService {
 
   static Future<Map<String, dynamic>> generateToddlerMockTest({
     required String toddlerId,
-    int count = 5,
+    int count = 40,
   }) async {
     final headers = await _authHeaders();
 
@@ -960,7 +1172,7 @@ class ApiService {
       },
       body: jsonEncode({'count': count}),
     )
-        .timeout(const Duration(seconds: 75));
+        .timeout(const Duration(seconds: 120));
 
     final data = _safeJson(res.body);
     if (res.statusCode != 200) {
