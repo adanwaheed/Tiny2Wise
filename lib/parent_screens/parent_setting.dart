@@ -6,6 +6,7 @@ import 'package:image_picker/image_picker.dart';
 
 import '../services/api_service.dart';
 import '../startup_screens/login_screen.dart';
+import 'parent_library.dart';
 
 class ParentSettingScreen extends StatefulWidget {
   final VoidCallback? onHomeTap;
@@ -54,6 +55,33 @@ class _ParentSettingScreenState extends State<ParentSettingScreen> {
   void initState() {
     super.initState();
     _loadProfile();
+  }
+
+  void _openLibraryFromSettings() {
+    Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (_) => ParentLibraryScreen(
+          onHomeTap: widget.onHomeTap == null
+              ? null
+              : () {
+            Navigator.pop(context);
+            widget.onHomeTap?.call();
+          },
+          onActivityTap: widget.onActivityTap == null
+              ? null
+              : () {
+            Navigator.pop(context);
+            widget.onActivityTap?.call();
+          },
+          onBookmarkTap: () {},
+          onSettingsTap: () {
+            Navigator.pop(context);
+          },
+          onCenterTap: widget.onCenterTap,
+        ),
+      ),
+    );
   }
 
   Future<void> _loadProfile({bool showLoader = true}) async {
@@ -418,7 +446,7 @@ class _ParentSettingScreenState extends State<ParentSettingScreen> {
         activeIndex: 3,
         onHomeTap: widget.onHomeTap,
         onActivityTap: widget.onActivityTap,
-        onBookmarkTap: widget.onBookmarkTap,
+        onBookmarkTap: widget.onBookmarkTap ?? _openLibraryFromSettings,
         onSettingsTap: widget.onSettingsTap,
         onCenterTap: widget.onCenterTap,
       ),

@@ -852,9 +852,9 @@ class _StoryTellingScreenState extends State<StoryTellingScreen> {
                     onActivityTap: () {
                       Navigator.pop(context);
                     },
-                    onBookmarkTap: () {},
+                    onBookmarkTap: widget.onBookmarkTap,
                     onSettingsTap: () {},
-                    onCenterTap: () {},
+                    onCenterTap: widget.onCenterTap,
                   ),
                 ),
               );

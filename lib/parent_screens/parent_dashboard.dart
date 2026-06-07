@@ -13,6 +13,7 @@ import 'parent_story_telling.dart';
 import 'parent_assigned_activities.dart';
 import 'parent_toddler_activity.dart';
 import 'parent_toddler_progress.dart';
+import 'parent_library.dart';
 
 class ParentDashboardScreen extends StatefulWidget {
   final String parentName;
@@ -324,6 +325,37 @@ class _ParentDashboardScreenState extends State<ParentDashboardScreen>
     }
   }
 
+  void _openLibrary() {
+    Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (_) => ParentLibraryScreen(
+          onHomeTap: () {
+            Navigator.pop(context);
+          },
+          onActivityTap: () {
+            Navigator.pop(context);
+            _openToddlerActivity();
+          },
+          onBookmarkTap: () {},
+          onSettingsTap: () {
+            Navigator.pop(context);
+            _openSettings();
+          },
+          onCenterTap: () {
+            HapticFeedback.lightImpact();
+            _openAssignedActivities();
+          },
+        ),
+      ),
+    ).then((_) {
+      if (activeToddlerId != null) {
+        _loadProgress(activeToddlerId!);
+        _loadAssignedActivities(activeToddlerId!);
+      }
+    });
+  }
+
   void _openSettings() {
     Navigator.push(
       context,
@@ -337,7 +369,8 @@ class _ParentDashboardScreenState extends State<ParentDashboardScreen>
             _openToddlerActivity();
           },
           onBookmarkTap: () {
-            // add your bookmark screen navigation here
+            Navigator.pop(context);
+            _openLibrary();
           },
           onSettingsTap: () {},
           onCenterTap: () {
@@ -384,7 +417,7 @@ class _ParentDashboardScreenState extends State<ParentDashboardScreen>
           },
           onBookmarkTap: () {
             HapticFeedback.selectionClick();
-            _toast("Bookmarks coming soon");
+            _openLibrary();
           },
           onSettingsTap: () {
             HapticFeedback.selectionClick();
@@ -844,7 +877,27 @@ class _ParentDashboardScreenState extends State<ParentDashboardScreen>
                                   Navigator.push(
                                     context,
                                     MaterialPageRoute(
-                                      builder: (_) => const StoryTellingScreen(),
+                                      builder: (_) => StoryTellingScreen(
+                                        onHomeTap: () {
+                                          Navigator.pop(context);
+                                        },
+                                        onActivityTap: () {
+                                          Navigator.pop(context);
+                                          _openToddlerActivity();
+                                        },
+                                        onBookmarkTap: () {
+                                          Navigator.pop(context);
+                                          _openLibrary();
+                                        },
+                                        onSettingsTap: () {
+                                          Navigator.pop(context);
+                                          _openSettings();
+                                        },
+                                        onCenterTap: () {
+                                          HapticFeedback.lightImpact();
+                                          _openAssignedActivities();
+                                        },
+                                      ),
                                     ),
                                   );
                                 },
